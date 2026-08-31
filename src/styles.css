@@ -500,8 +500,7 @@ button:focus-visible,
   padding: 0 clamp(22px, 3vw, 46px);
 }
 
-.back-button,
-.reader-footer button {
+.back-button {
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -519,8 +518,7 @@ button:focus-visible,
   justify-self: start;
 }
 
-.back-button:hover,
-.reader-footer button:hover {
+.back-button:hover {
   color: #2f6a52;
   opacity: 1;
 }
@@ -646,6 +644,36 @@ button:focus-visible,
   font-size: 12px;
 }
 
+.flow-settings-row {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(35, 49, 43, 0.1);
+}
+
+.flow-options {
+  display: grid;
+  grid-template-columns: repeat(2, 56px);
+  padding: 2px;
+  border: 1px solid rgba(35, 49, 43, 0.15);
+  border-radius: 5px;
+}
+
+.flow-options button {
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.flow-options button.is-selected {
+  color: #f7f4ed;
+  background: #47705e;
+}
+
 .theme-options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -697,9 +725,35 @@ button:focus-visible,
   right: clamp(24px, 4vw, 58px);
   bottom: 16px;
   left: clamp(24px, 4vw, 58px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.reader-footer.is-paginated {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
+  pointer-events: auto;
+}
+
+.reader-footer button {
+  display: inline-flex;
   align-items: center;
+  gap: 9px;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--serif);
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.84;
+}
+
+.reader-footer button:hover {
+  color: #2f6a52;
+  opacity: 1;
 }
 
 .reader-footer button:first-child {

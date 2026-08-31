@@ -8,7 +8,11 @@ import {
   Settings,
 } from 'lucide-react'
 import { getBookFile, updateBookReadingState } from '../../lib/book-storage'
-import { ReaderSettings, type ReaderTheme } from './ReaderSettings'
+import {
+  ReaderSettings,
+  type ReaderFlow,
+  type ReaderTheme,
+} from './ReaderSettings'
 import { TocPanel } from './TocPanel'
 import type {
   BookRecord,
@@ -32,6 +36,18 @@ const THEME_COLORS: Record<
   paper: { background: '#f5f2eb', color: '#1e2925' },
   light: { background: '#ffffff', color: '#18201d' },
   night: { background: '#202421', color: '#e6e1d5' },
+}
+
+const READER_FLOW_STORAGE_KEY = 'lento:reader-flow:v1'
+
+function getInitialReaderFlow(): ReaderFlow {
+  try {
+    return localStorage.getItem(READER_FLOW_STORAGE_KEY) === 'paginated'
+      ? 'paginated'
+      : 'scrolled'
+  } catch {
+    return 'scrolled'
+  }
 }
 
 function findChapterLabel(
@@ -90,15 +106,17 @@ export function ReaderPage({
   onBookUpdate,
 }: ReaderPageProps) {
   const viewerRef = useRef<HTMLDivElement>(null)
-  const bookRef = useRef<EpubBook | null>(null)
   const renditionRef = useRef<EpubRendition | null>(null)
   const tocRef = useRef<TocItem[]>([])
+  const currentLocationRef = useRef(bookRecord.location)
+  const currentBookIdRef = useRef(bookRecord.id)
   const [toc, setToc] = useState<TocItem[]>([])
   const [tocOpen, setTocOpen] = useState(() => window.innerWidth >= 980)
   const [currentHref, setCurrentHref] = useState<string>()
   const [chapterLabel, setChapterLabel] = useState(bookRecord.chapterLabel)
   const [progress, setProgress] = useState(bookRecord.progress)
   const [fontSize, setFontSize] = useState(19)
+  const [readerFlow, setReaderFlow] = useState<ReaderFlow>(getInitialReaderFlow)
   const [theme, setTheme] = useState<ReaderTheme>('paper')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [error, setError] = useState<string>()
@@ -106,11 +124,40 @@ export function ReaderPage({
   useEffect(() => {
     const viewer = viewerRef.current
     if (!viewer) return
+    if (currentBookIdRef.current !== bookRecord.id) {
+      currentBookIdRef.current = bookRecord.id
+      currentLocationRef.current = bookRecord.location
+    }
+    setError(undefined)
 
     let isCancelled = false
+    let effectBook: EpubBook | null = null
+    let effectRendition: EpubRendition | null = null
+    let removeContentScrollBridge: (() => void) | undefined
+    let persistTimer: ReturnType<typeof setTimeout> | undefined
+    let pendingReadingState:
+      | Pick<BookRecord, 'progress' | 'location' | 'chapterLabel'>
+      | undefined
+
+    function persistReadingState() {
+      const readingState = pendingReadingState
+      pendingReadingState = undefined
+      if (!readingState) return
+
+      void updateBookReadingState(bookRecord.id, readingState).then(
+        (updatedBook) => {
+          if (updatedBook) onBookUpdate(updatedBook)
+        },
+      )
+    }
 
     async function openBook(viewerElement: HTMLDivElement) {
       try {
+        // Let React's development-only StrictMode cleanup cancel the first run
+        // before EPUB.js starts its asynchronous rendition lifecycle.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        if (isCancelled) return
+
         const data = await getBookFile(bookRecord.id)
         if (!data) throw new Error('找不到原始 EPUB 文件。')
         if (isCancelled) return
@@ -119,12 +166,91 @@ export function ReaderPage({
         const rendition = epubBook.renderTo(viewerElement, {
           width: '100%',
           height: '100%',
-          flow: 'paginated',
+          manager: readerFlow === 'scrolled' ? 'continuous' : 'default',
+          flow: readerFlow === 'scrolled' ? 'scrolled' : 'paginated',
           spread: 'none',
         })
-        bookRef.current = epubBook
+        effectBook = epubBook
+        effectRendition = rendition
         renditionRef.current = rendition
         registerReaderTheme(rendition, theme, fontSize)
+
+        if (readerFlow === 'scrolled') {
+          const contentDocuments = new Set<Document>()
+          let lastTouchY: number | undefined
+
+          function getScrollContainer() {
+            return viewerElement.querySelector<HTMLElement>('.epub-container')
+          }
+
+          function scrollBy(deltaY: number, event: Event) {
+            const container = getScrollContainer()
+            if (!container) return
+            const previousScrollTop = container.scrollTop
+            container.scrollTop += deltaY
+            if (container.scrollTop !== previousScrollTop) event.preventDefault()
+          }
+
+          function attachContentScrollBridge(
+            _section: unknown,
+            view: { document?: Document },
+          ) {
+            const document = view.document
+            if (!document || contentDocuments.has(document)) return
+            contentDocuments.add(document)
+
+            document.addEventListener(
+              'wheel',
+              (event) => {
+                if (event.ctrlKey) return
+                const container = getScrollContainer()
+                if (!container) return
+                const scale =
+                  event.deltaMode === WheelEvent.DOM_DELTA_LINE
+                    ? 18
+                    : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                      ? container.clientHeight
+                      : 1
+                scrollBy(event.deltaY * scale, event)
+              },
+              { passive: false },
+            )
+            document.addEventListener(
+              'touchstart',
+              (event) => {
+                if (event.touches.length === 1) {
+                  lastTouchY = event.touches[0].clientY
+                }
+              },
+              { passive: true },
+            )
+            document.addEventListener(
+              'touchmove',
+              (event) => {
+                if (event.touches.length !== 1 || lastTouchY === undefined) {
+                  return
+                }
+                const nextTouchY = event.touches[0].clientY
+                scrollBy(lastTouchY - nextTouchY, event)
+                lastTouchY = nextTouchY
+              },
+              { passive: false },
+            )
+            const clearTouch = () => {
+              lastTouchY = undefined
+            }
+            document.addEventListener('touchend', clearTouch, { passive: true })
+            document.addEventListener('touchcancel', clearTouch, {
+              passive: true,
+            })
+          }
+
+          rendition.on('rendered', attachContentScrollBridge)
+          removeContentScrollBridge = () => {
+            rendition.off('rendered', attachContentScrollBridge)
+            contentDocuments.clear()
+          }
+        }
 
         const navigation = await epubBook.loaded.navigation
         if (isCancelled) return
@@ -147,16 +273,17 @@ export function ReaderPage({
           setCurrentHref(location.start.href)
           setProgress(nextProgress)
           setChapterLabel(nextChapter)
-          void updateBookReadingState(bookRecord.id, {
+          currentLocationRef.current = location.start.cfi
+          pendingReadingState = {
             location: location.start.cfi,
             progress: nextProgress,
             chapterLabel: nextChapter,
-          }).then((updatedBook) => {
-            if (updatedBook) onBookUpdate(updatedBook)
-          })
+          }
+          clearTimeout(persistTimer)
+          persistTimer = setTimeout(persistReadingState, 350)
         })
 
-        await rendition.display(bookRecord.location)
+        await rendition.display(currentLocationRef.current)
       } catch (readerError) {
         if (!isCancelled) {
           setError(
@@ -172,13 +299,17 @@ export function ReaderPage({
 
     return () => {
       isCancelled = true
-      renditionRef.current?.destroy()
-      bookRef.current?.destroy()
-      renditionRef.current = null
-      bookRef.current = null
+      clearTimeout(persistTimer)
+      persistReadingState()
+      removeContentScrollBridge?.()
+      effectRendition?.destroy()
+      effectBook?.destroy()
+      if (renditionRef.current === effectRendition) {
+        renditionRef.current = null
+      }
       viewer.replaceChildren()
     }
-  }, [bookRecord.id])
+  }, [bookRecord.id, readerFlow])
 
   useEffect(() => {
     const rendition = renditionRef.current
@@ -188,6 +319,15 @@ export function ReaderPage({
   function displayChapter(href: string) {
     void renditionRef.current?.display(href)
     if (window.innerWidth < 980) setTocOpen(false)
+  }
+
+  function handleReaderFlowChange(flow: ReaderFlow) {
+    setReaderFlow(flow)
+    try {
+      localStorage.setItem(READER_FLOW_STORAGE_KEY, flow)
+    } catch {
+      // Reading still works when local storage is unavailable.
+    }
   }
 
   const percent = Math.round(progress * 100)
@@ -237,8 +377,10 @@ export function ReaderPage({
                 {settingsOpen ? (
                   <ReaderSettings
                     fontSize={fontSize}
+                    flow={readerFlow}
                     theme={theme}
                     onFontSizeChange={setFontSize}
+                    onFlowChange={handleReaderFlowChange}
                     onThemeChange={setTheme}
                   />
                 ) : null}
@@ -260,22 +402,33 @@ export function ReaderPage({
             )}
           </div>
 
-          <footer className="reader-footer">
-            <button
-              type="button"
-              onClick={() => void renditionRef.current?.prev()}
-            >
-              <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.5} />
-              上一页
-            </button>
+          <footer
+            className={
+              readerFlow === 'paginated'
+                ? 'reader-footer is-paginated'
+                : 'reader-footer'
+            }
+            aria-label={`阅读进度 ${percent}%`}
+          >
+            {readerFlow === 'paginated' ? (
+              <button
+                type="button"
+                onClick={() => void renditionRef.current?.prev()}
+              >
+                <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.5} />
+                上一页
+              </button>
+            ) : null}
             <span>{percent}%</span>
-            <button
-              type="button"
-              onClick={() => void renditionRef.current?.next()}
-            >
-              下一页
-              <ChevronRight aria-hidden="true" size={18} strokeWidth={1.5} />
-            </button>
+            {readerFlow === 'paginated' ? (
+              <button
+                type="button"
+                onClick={() => void renditionRef.current?.next()}
+              >
+                下一页
+                <ChevronRight aria-hidden="true" size={18} strokeWidth={1.5} />
+              </button>
+            ) : null}
           </footer>
           <div className="reader-progress" aria-hidden="true">
             <span style={{ width: `${percent}%` }} />
