@@ -1261,8 +1261,16 @@ button:focus-visible,
   padding: 0 clamp(18px, 5vw, 74px);
 }
 
+.reader-stage.is-scroll-flow {
+  padding-inline: 0;
+}
+
 .epub-viewer {
   width: min(760px, 100%);
+}
+
+.reader-stage.is-scroll-flow .epub-viewer {
+  width: 100%;
 }
 
 .reader-footer {

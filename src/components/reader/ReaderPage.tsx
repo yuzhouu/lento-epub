@@ -132,6 +132,7 @@ function registerReaderTheme(
   rendition: EpubRendition,
   theme: ReaderTheme,
   fontSize: number,
+  flow: ReaderFlow,
 ) {
   const colors = THEME_COLORS[theme]
   rendition.themes.register('lento', {
@@ -141,7 +142,17 @@ function registerReaderTheme(
       'font-family':
         '"Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif !important',
       'line-height': '2.05 !important',
-      padding: '0 4vw !important',
+      padding:
+        flow === 'paginated'
+          ? '0 4vw !important'
+          : '0 min(4vw, 30px) !important',
+      ...(flow !== 'paginated'
+        ? {
+            width: 'min(760px, calc(100% - 8px)) !important',
+            margin: '0 auto !important',
+            'box-sizing': 'border-box !important',
+          }
+        : {}),
     },
     p: {
       'font-size': `${fontSize}px !important`,
@@ -243,7 +254,7 @@ export function ReaderPage({
         effectBook = epubBook
         effectRendition = rendition
         renditionRef.current = rendition
-        registerReaderTheme(rendition, theme, fontSize)
+        registerReaderTheme(rendition, theme, fontSize, readerFlow)
 
         if (readerFlow !== 'paginated') {
           const contentDocuments = new Set<Document>()
@@ -462,8 +473,8 @@ export function ReaderPage({
 
   useEffect(() => {
     const rendition = renditionRef.current
-    if (rendition) registerReaderTheme(rendition, theme, fontSize)
-  }, [fontSize, theme])
+    if (rendition) registerReaderTheme(rendition, theme, fontSize, readerFlow)
+  }, [fontSize, readerFlow, theme])
 
   function displayChapter(href: string) {
     setChapterProgress(0)
@@ -579,7 +590,13 @@ export function ReaderPage({
             </div>
           </header>
 
-          <div className="reader-stage">
+          <div
+            className={
+              readerFlow === 'paginated'
+                ? 'reader-stage'
+                : 'reader-stage is-scroll-flow'
+            }
+          >
             {error ? (
               <div className="reader-error" role="alert">
                 <h1>没有打开这本书</h1>
