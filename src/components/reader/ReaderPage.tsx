@@ -8,6 +8,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { getBookFile, updateBookReadingState } from '../../lib/book-storage'
+import { sanitizeEpubFontSources } from '../../lib/epub-font-sanitizer'
 import {
   ReaderSettings,
   type ReaderFlow,
@@ -280,6 +281,7 @@ export function ReaderPage({
     let locationsReady = false
     let effectBook: EpubBook | null = null
     let effectRendition: EpubRendition | null = null
+    let releaseSanitizedFontStyles: (() => void) | undefined
     let removeContentScrollBridge: (() => void) | undefined
     let removeContentSettingsDismissal: (() => void) | undefined
     let removeRelocationListener: (() => void) | undefined
@@ -315,6 +317,16 @@ export function ReaderPage({
         setOpeningMessage('正在排版正文…')
 
         const epubBook = ePub(data.slice(0))
+        effectBook = epubBook
+        const releaseFontStyles = await sanitizeEpubFontSources(
+          epubBook as unknown as Parameters<typeof sanitizeEpubFontSources>[0],
+        )
+        if (isCancelled) {
+          releaseFontStyles()
+          return
+        }
+        releaseSanitizedFontStyles = releaseFontStyles
+
         const rendition = epubBook.renderTo(viewerElement, {
           width: '100%',
           height: '100%',
@@ -322,7 +334,6 @@ export function ReaderPage({
           flow: readerFlow === 'paginated' ? 'paginated' : 'scrolled',
           spread: 'none',
         })
-        effectBook = epubBook
         effectRendition = rendition
         renditionRef.current = rendition
         registerReaderTheme(rendition, theme, fontSize, readerFlow)
@@ -600,6 +611,7 @@ export function ReaderPage({
       removeRelocationListener?.()
       effectRendition?.destroy()
       effectBook?.destroy()
+      releaseSanitizedFontStyles?.()
       if (renditionRef.current === effectRendition) {
         renditionRef.current = null
       }
