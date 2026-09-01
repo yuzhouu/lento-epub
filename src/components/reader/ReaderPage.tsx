@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import ePub from 'epubjs'
 import {
   ChevronLeft,
@@ -18,7 +18,10 @@ import {
 import {
   ReaderSettings,
   type ReaderFlow,
+  type ReaderLineHeight,
+  type ReaderParagraphStyle,
   type ReaderTheme,
+  type ReaderWidth,
 } from './ReaderSettings'
 import { TocPanel } from './TocPanel'
 import type {
@@ -51,9 +54,32 @@ const READER_FONT_STORAGE_KEY = 'lento:reader-font:v2'
 const LEGACY_READER_FONT_STORAGE_KEY = 'lento:reader-font:v1'
 const READER_FONT_SIZE_STORAGE_KEY = 'lento:reader-font-size:v1'
 const READER_THEME_STORAGE_KEY = 'lento:reader-theme:v1'
+const READER_LINE_HEIGHT_STORAGE_KEY = 'lento:reader-line-height:v1'
+const READER_WIDTH_STORAGE_KEY = 'lento:reader-width:v1'
+const READER_PARAGRAPH_STYLE_STORAGE_KEY = 'lento:reader-paragraph-style:v1'
+const KEYBOARD_PAGINATION_STORAGE_KEY = 'lento:keyboard-pagination:v1'
+const CLICK_PAGINATION_STORAGE_KEY = 'lento:click-pagination:v1'
 const DEFAULT_READER_FONT_SIZE = 18
 const MIN_READER_FONT_SIZE = 15
 const MAX_READER_FONT_SIZE = 26
+
+const READER_LINE_HEIGHTS: Record<ReaderLineHeight, number> = {
+  compact: 1.72,
+  standard: 2.05,
+  relaxed: 2.4,
+}
+
+const READER_WIDTHS: Record<ReaderWidth, number> = {
+  narrow: 620,
+  standard: 760,
+  wide: 940,
+}
+
+const PAGINATED_HORIZONTAL_PADDING: Record<ReaderWidth, string> = {
+  narrow: 'clamp(34px, 9vw, 76px)',
+  standard: 'clamp(22px, 5vw, 46px)',
+  wide: 'clamp(14px, 3vw, 28px)',
+}
 
 function getInitialReaderFont(): ReaderFont {
   try {
@@ -121,6 +147,89 @@ function getInitialReaderTheme(): ReaderTheme {
   }
 
   return 'light'
+}
+
+function getInitialReaderLineHeight(): ReaderLineHeight {
+  try {
+    const savedLineHeight = localStorage.getItem(
+      READER_LINE_HEIGHT_STORAGE_KEY,
+    )
+    if (
+      savedLineHeight === 'compact' ||
+      savedLineHeight === 'standard' ||
+      savedLineHeight === 'relaxed'
+    ) {
+      return savedLineHeight
+    }
+  } catch {
+    // Fall back to the current reader line height.
+  }
+
+  return 'standard'
+}
+
+function getInitialReaderWidth(): ReaderWidth {
+  try {
+    const savedReaderWidth = localStorage.getItem(READER_WIDTH_STORAGE_KEY)
+    if (
+      savedReaderWidth === 'narrow' ||
+      savedReaderWidth === 'standard' ||
+      savedReaderWidth === 'wide'
+    ) {
+      return savedReaderWidth
+    }
+  } catch {
+    // Fall back to the current reader width.
+  }
+
+  return 'standard'
+}
+
+function getInitialParagraphStyle(): ReaderParagraphStyle {
+  try {
+    const savedParagraphStyle = localStorage.getItem(
+      READER_PARAGRAPH_STYLE_STORAGE_KEY,
+    )
+    if (
+      savedParagraphStyle === 'publisher' ||
+      savedParagraphStyle === 'indent' ||
+      savedParagraphStyle === 'spaced'
+    ) {
+      return savedParagraphStyle
+    }
+  } catch {
+    // Fall back to publisher paragraph formatting.
+  }
+
+  return 'publisher'
+}
+
+function getInitialBooleanPreference(key: string, defaultValue: boolean) {
+  try {
+    const storedValue = localStorage.getItem(key)
+    if (storedValue === 'true') return true
+    if (storedValue === 'false') return false
+  } catch {
+    // Fall back to the provided default when local storage is unavailable.
+  }
+
+  return defaultValue
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (
+    !target ||
+    typeof (target as { closest?: unknown }).closest !== 'function'
+  ) {
+    return false
+  }
+  const element = target as Element
+  if (element.closest('.page-turn-zone')) return false
+  return Boolean(
+    element.closest(
+      'input, textarea, select, button, [contenteditable="true"]',
+    ),
+  )
 }
 
 function findChapterLabel(
@@ -197,9 +306,25 @@ function registerReaderTheme(
   font: ReaderFont,
   fontSize: number,
   flow: ReaderFlow,
+  lineHeight: ReaderLineHeight,
+  readerWidth: ReaderWidth,
+  paragraphStyle: ReaderParagraphStyle,
 ) {
   const colors = THEME_COLORS[theme]
   const fontFamily = getReaderFontFamily(font)
+  const lineHeightValue = READER_LINE_HEIGHTS[lineHeight]
+  const paragraphRules =
+    paragraphStyle === 'indent'
+      ? {
+          'text-indent': '2em !important',
+          'margin-block': '0.35em !important',
+        }
+      : paragraphStyle === 'spaced'
+        ? {
+            'text-indent': '0 !important',
+            'margin-block': '0 1em !important',
+          }
+        : {}
 
   // EPUB.js appends rules when a named theme is updated. Recreate its style
   // node so selecting “原书” can genuinely remove a previous font override.
@@ -216,14 +341,14 @@ function registerReaderTheme(
     body: {
       color: `${colors.color} !important`,
       background: `${colors.background} !important`,
-      'line-height': '2.05 !important',
+      'line-height': `${lineHeightValue} !important`,
       padding:
         flow === 'paginated'
-          ? '0 4vw !important'
+          ? `0 ${PAGINATED_HORIZONTAL_PADDING[readerWidth]} !important`
           : '0 min(4vw, 30px) !important',
       ...(flow !== 'paginated'
         ? {
-            width: 'min(760px, calc(100% - 8px)) !important',
+            width: `min(${READER_WIDTHS[readerWidth]}px, calc(100% - 8px)) !important`,
             margin: '0 auto !important',
             'box-sizing': 'border-box !important',
           }
@@ -238,8 +363,8 @@ function registerReaderTheme(
       : {}),
     p: {
       'font-size': `${fontSize}px !important`,
-      'line-height': '2.05 !important',
-      'text-align': 'justify',
+      'line-height': `${lineHeightValue} !important`,
+      ...paragraphRules,
     },
     h1: {
       'font-size': `${Math.round(fontSize * 1.75)}px !important`,
@@ -265,6 +390,10 @@ export function ReaderPage({
   const viewerRef = useRef<HTMLDivElement>(null)
   const settingsAnchorRef = useRef<HTMLDivElement>(null)
   const renditionRef = useRef<EpubRendition | null>(null)
+  const keyboardPaginationRef = useRef(true)
+  const paginationNavigationRef = useRef<
+    (direction: 'previous' | 'next') => void
+  >(() => undefined)
   const tocRef = useRef<TocItem[]>([])
   const currentLocationRef = useRef(bookRecord.location)
   const currentBookIdRef = useRef(bookRecord.id)
@@ -278,11 +407,27 @@ export function ReaderPage({
   const [font, setFont] = useState<ReaderFont>(getInitialReaderFont)
   const [fontSize, setFontSize] = useState(getInitialReaderFontSize)
   const [readerFlow, setReaderFlow] = useState<ReaderFlow>(getInitialReaderFlow)
+  const [lineHeight, setLineHeight] = useState<ReaderLineHeight>(
+    getInitialReaderLineHeight,
+  )
+  const [readerWidth, setReaderWidth] = useState<ReaderWidth>(
+    getInitialReaderWidth,
+  )
+  const [paragraphStyle, setParagraphStyle] =
+    useState<ReaderParagraphStyle>(getInitialParagraphStyle)
+  const [keyboardPagination, setKeyboardPagination] = useState(() =>
+    getInitialBooleanPreference(KEYBOARD_PAGINATION_STORAGE_KEY, true),
+  )
+  const [clickPagination, setClickPagination] = useState(() =>
+    getInitialBooleanPreference(CLICK_PAGINATION_STORAGE_KEY, false),
+  )
   const [theme, setTheme] = useState<ReaderTheme>(getInitialReaderTheme)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [isOpening, setIsOpening] = useState(true)
   const [openingMessage, setOpeningMessage] = useState('正在读取书籍…')
   const [error, setError] = useState<string>()
+
+  keyboardPaginationRef.current = keyboardPagination
 
   useEffect(() => {
     if (!settingsOpen) return
@@ -377,9 +522,40 @@ export function ReaderPage({
         })
         effectRendition = rendition
         renditionRef.current = rendition
-        registerReaderTheme(rendition, theme, font, fontSize, readerFlow)
+        registerReaderTheme(
+          rendition,
+          theme,
+          font,
+          fontSize,
+          readerFlow,
+          lineHeight,
+          readerWidth,
+          paragraphStyle,
+        )
 
         const settingsDocuments = new Set<Document>()
+        function handlePaginationKeyDown(event: KeyboardEvent) {
+          if (
+            readerFlow !== 'paginated' ||
+            !keyboardPaginationRef.current ||
+            event.altKey ||
+            event.ctrlKey ||
+            event.metaKey ||
+            event.shiftKey ||
+            isEditableKeyboardTarget(event.target)
+          ) {
+            return
+          }
+
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault()
+            paginationNavigationRef.current('previous')
+          } else if (event.key === 'ArrowRight') {
+            event.preventDefault()
+            paginationNavigationRef.current('next')
+          }
+        }
+
         function attachSettingsDismissal(
           _section: unknown,
           view: { document?: Document },
@@ -388,6 +564,7 @@ export function ReaderPage({
           if (!contentDocument || settingsDocuments.has(contentDocument)) return
           settingsDocuments.add(contentDocument)
           contentDocument.addEventListener('pointerdown', closeReaderSettings)
+          contentDocument.addEventListener('keydown', handlePaginationKeyDown)
         }
         function closeReaderSettings() {
           setSettingsOpen(false)
@@ -399,6 +576,10 @@ export function ReaderPage({
             contentDocument.removeEventListener(
               'pointerdown',
               closeReaderSettings,
+            )
+            contentDocument.removeEventListener(
+              'keydown',
+              handlePaginationKeyDown,
             )
           })
           settingsDocuments.clear()
@@ -663,9 +844,91 @@ export function ReaderPage({
   useEffect(() => {
     const rendition = renditionRef.current
     if (rendition) {
-      registerReaderTheme(rendition, theme, font, fontSize, readerFlow)
+      registerReaderTheme(
+        rendition,
+        theme,
+        font,
+        fontSize,
+        readerFlow,
+        lineHeight,
+        readerWidth,
+        paragraphStyle,
+      )
     }
-  }, [font, fontSize, readerFlow, theme])
+  }, [
+    font,
+    fontSize,
+    lineHeight,
+    paragraphStyle,
+    readerFlow,
+    readerWidth,
+    theme,
+  ])
+
+  useEffect(() => {
+    if (readerFlow !== 'paginated' || typeof ResizeObserver === 'undefined') {
+      return
+    }
+
+    const viewer = viewerRef.current
+    if (!viewer) return
+
+    let resizeFrame: number | undefined
+    let previousWidth = viewer.clientWidth
+    let previousHeight = viewer.clientHeight
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      const width = Math.floor(entry.contentRect.width)
+      const height = Math.floor(entry.contentRect.height)
+      if (
+        width <= 0 ||
+        height <= 0 ||
+        (width === previousWidth && height === previousHeight)
+      ) {
+        return
+      }
+
+      previousWidth = width
+      previousHeight = height
+      cancelAnimationFrame(resizeFrame ?? 0)
+      resizeFrame = requestAnimationFrame(() => {
+        renditionRef.current?.resize(width, height)
+      })
+    })
+    resizeObserver.observe(viewer)
+
+    return () => {
+      resizeObserver.disconnect()
+      cancelAnimationFrame(resizeFrame ?? 0)
+    }
+  }, [bookRecord.id, readerFlow])
+
+  useEffect(() => {
+    if (readerFlow !== 'paginated') return
+
+    function handlePaginationKeyDown(event: KeyboardEvent) {
+      if (
+        !keyboardPaginationRef.current ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        isEditableKeyboardTarget(event.target)
+      ) {
+        return
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        paginationNavigationRef.current('previous')
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        paginationNavigationRef.current('next')
+      }
+    }
+
+    document.addEventListener('keydown', handlePaginationKeyDown)
+    return () => document.removeEventListener('keydown', handlePaginationKeyDown)
+  }, [readerFlow])
 
   function displayChapter(href: string) {
     setChapterProgress(0)
@@ -713,6 +976,51 @@ export function ReaderPage({
     }
   }
 
+  function handleLineHeightChange(nextLineHeight: ReaderLineHeight) {
+    setLineHeight(nextLineHeight)
+    try {
+      localStorage.setItem(READER_LINE_HEIGHT_STORAGE_KEY, nextLineHeight)
+    } catch {
+      // Reading still works when local storage is unavailable.
+    }
+  }
+
+  function handleReaderWidthChange(nextReaderWidth: ReaderWidth) {
+    setReaderWidth(nextReaderWidth)
+    try {
+      localStorage.setItem(READER_WIDTH_STORAGE_KEY, nextReaderWidth)
+    } catch {
+      // Reading still works when local storage is unavailable.
+    }
+  }
+
+  function handleParagraphStyleChange(nextStyle: ReaderParagraphStyle) {
+    setParagraphStyle(nextStyle)
+    try {
+      localStorage.setItem(READER_PARAGRAPH_STYLE_STORAGE_KEY, nextStyle)
+    } catch {
+      // Reading still works when local storage is unavailable.
+    }
+  }
+
+  function handleKeyboardPaginationChange(enabled: boolean) {
+    setKeyboardPagination(enabled)
+    try {
+      localStorage.setItem(KEYBOARD_PAGINATION_STORAGE_KEY, String(enabled))
+    } catch {
+      // Reading still works when local storage is unavailable.
+    }
+  }
+
+  function handleClickPaginationChange(enabled: boolean) {
+    setClickPagination(enabled)
+    try {
+      localStorage.setItem(CLICK_PAGINATION_STORAGE_KEY, String(enabled))
+    } catch {
+      // Reading still works when local storage is unavailable.
+    }
+  }
+
   const chapterPercent = Math.round(chapterProgress * 100)
   const chapterNeighbors = currentHref
     ? findChapterNeighbors(toc, currentHref)
@@ -732,8 +1040,20 @@ export function ReaderPage({
     void renditionRef.current?.next()
   }
 
+  paginationNavigationRef.current = (direction) => {
+    if (direction === 'previous') {
+      void renditionRef.current?.prev()
+      return
+    }
+    handleForward()
+  }
+
+  const readerLayoutStyle = {
+    '--reader-column-width': `${READER_WIDTHS[readerWidth]}px`,
+  } as CSSProperties
+
   return (
-    <main className={`reader-page theme-${theme}`}>
+    <main className={`reader-page theme-${theme}`} style={readerLayoutStyle}>
       <div className={tocOpen ? 'reader-layout toc-is-open' : 'reader-layout'}>
         {tocOpen ? (
           <>
@@ -799,10 +1119,22 @@ export function ReaderPage({
                     font={font}
                     fontSize={fontSize}
                     flow={readerFlow}
+                    lineHeight={lineHeight}
+                    readerWidth={readerWidth}
+                    paragraphStyle={paragraphStyle}
+                    keyboardPagination={keyboardPagination}
+                    clickPagination={clickPagination}
                     theme={theme}
                     onFontChange={handleFontChange}
                     onFontSizeChange={handleFontSizeChange}
                     onFlowChange={handleReaderFlowChange}
+                    onLineHeightChange={handleLineHeightChange}
+                    onReaderWidthChange={handleReaderWidthChange}
+                    onParagraphStyleChange={handleParagraphStyleChange}
+                    onKeyboardPaginationChange={
+                      handleKeyboardPaginationChange
+                    }
+                    onClickPaginationChange={handleClickPaginationChange}
                     onThemeChange={handleThemeChange}
                   />
                 ) : null}
@@ -829,6 +1161,38 @@ export function ReaderPage({
             ) : (
               <>
                 <div ref={viewerRef} className="epub-viewer" />
+                {readerFlow === 'paginated' &&
+                clickPagination &&
+                !isOpening ? (
+                  <>
+                    <button
+                      className="page-turn-zone is-previous"
+                      type="button"
+                      aria-label="点击左侧区域翻到上一页"
+                      onClick={() =>
+                        paginationNavigationRef.current('previous')
+                      }
+                    >
+                      <ChevronLeft
+                        aria-hidden="true"
+                        size={22}
+                        strokeWidth={1.5}
+                      />
+                    </button>
+                    <button
+                      className="page-turn-zone is-next"
+                      type="button"
+                      aria-label="点击右侧区域翻到下一页"
+                      onClick={() => paginationNavigationRef.current('next')}
+                    >
+                      <ChevronRight
+                        aria-hidden="true"
+                        size={22}
+                        strokeWidth={1.5}
+                      />
+                    </button>
+                  </>
+                ) : null}
                 {isOpening ? (
                   <div
                     className="reader-loading"
