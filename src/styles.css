@@ -2178,10 +2178,6 @@ button:focus-visible,
 }
 
 .reader-layout.toc-is-open {
-  grid-template-columns: 272px minmax(0, 1fr);
-}
-
-.reader-layout.toc-is-open.search-is-open {
   grid-template-columns: 340px minmax(0, 1fr);
 }
 
@@ -2830,8 +2826,7 @@ button:focus-visible,
 }
 
 @media (max-width: 780px) {
-  .reader-layout.toc-is-open,
-  .reader-layout.toc-is-open.search-is-open {
+  .reader-layout.toc-is-open {
     grid-template-columns: 1fr;
   }
 
