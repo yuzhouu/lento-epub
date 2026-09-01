@@ -1,23 +1,16 @@
 import { useCallback, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { getStorageErrorMessage } from '../../lib/book-storage'
+import type { LibraryAlertNotice } from './LibraryAlert'
 import type { BookRecord } from '../../types/book'
 import type { EpubImportResult } from '../../lib/import-epub'
-
-export interface ImportNotice {
-  kind: 'success' | 'error'
-  message: string
-  detail?: string
-}
 
 interface UseBookImportResult {
   importFiles: (files: File[]) => Promise<void>
   isImporting: boolean
-  notice?: ImportNotice
-  clearNotice: () => void
 }
 
-function describeImportResult(result: EpubImportResult): ImportNotice {
+function describeImportResult(result: EpubImportResult): LibraryAlertNotice {
   const importedCount = result.imported.length
   const duplicateCount = result.duplicates.length
   const failureCount = result.failures.length
@@ -46,10 +39,10 @@ function describeImportResult(result: EpubImportResult): ImportNotice {
 
 export function useBookImport(
   onImported: (books: BookRecord[]) => void,
+  onAlert: (notice: LibraryAlertNotice | undefined) => void,
 ): UseBookImportResult {
   const importingRef = useRef(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [notice, setNotice] = useState<ImportNotice>()
 
   const importFiles = useCallback(
     async (files: File[]) => {
@@ -57,14 +50,14 @@ export function useBookImport(
 
       importingRef.current = true
       setIsImporting(true)
-      setNotice(undefined)
+      onAlert(undefined)
       try {
         const { importEpubFiles } = await import('../../lib/import-epub')
         const result = await importEpubFiles(files)
         if (result.imported.length > 0) onImported(result.imported)
-        setNotice(describeImportResult(result))
+        onAlert(describeImportResult(result))
       } catch (importError) {
-        setNotice({
+        onAlert({
           kind: 'error',
           message:
             getStorageErrorMessage(importError) ??
@@ -77,14 +70,12 @@ export function useBookImport(
         setIsImporting(false)
       }
     },
-    [onImported],
+    [onAlert, onImported],
   )
 
   return {
     importFiles,
     isImporting,
-    notice,
-    clearNotice: () => setNotice(undefined),
   }
 }
 

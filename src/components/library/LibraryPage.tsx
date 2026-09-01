@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { BookOpenText, Files, TriangleAlert, X } from 'lucide-react'
+import { BookOpenText, Files, TriangleAlert } from 'lucide-react'
 import { BookRow } from './BookRow'
 import { DeleteBookDialog } from './DeleteBookDialog'
 import { ImportBookButton, useBookImport } from './ImportBookButton'
 import { InstallAppButton } from './InstallAppButton'
+import {
+  LibraryAlert,
+  type LibraryAlertNotice,
+} from './LibraryAlert'
 import { LibraryBackupActions } from './LibraryBackupActions'
 import {
   getLibraryStorageInfo,
@@ -19,11 +23,6 @@ interface LibraryPageProps {
   onDelete: (id: string) => Promise<DeletedBookEntry | undefined>
   onUndoDelete: (entry: DeletedBookEntry) => Promise<void>
   onOpen: (id: string) => void
-}
-
-interface LibraryNotice {
-  kind: 'success' | 'error'
-  message: string
 }
 
 function containsFiles(event: DragEvent<HTMLElement>): boolean {
@@ -50,9 +49,9 @@ export function LibraryPage({
   const [bookToDelete, setBookToDelete] = useState<BookRecord>()
   const [isDeleting, setIsDeleting] = useState(false)
   const [deletedEntry, setDeletedEntry] = useState<DeletedBookEntry>()
-  const [libraryNotice, setLibraryNotice] = useState<LibraryNotice>()
+  const [libraryNotice, setLibraryNotice] = useState<LibraryAlertNotice>()
   const [storageInfo, setStorageInfo] = useState<LibraryStorageInfo>()
-  const importer = useBookImport(onImported)
+  const importer = useBookImport(onImported, setLibraryNotice)
 
   useEffect(() => {
     let isCurrent = true
@@ -176,6 +175,7 @@ export function LibraryPage({
           <LibraryBackupActions
             hasBooks={books.length > 0}
             onRestored={onRestored}
+            onAlert={setLibraryNotice}
           />
           <ImportBookButton
             isImporting={importer.isImporting}
@@ -277,46 +277,14 @@ export function LibraryPage({
         />
       ) : null}
 
-      {importer.notice || libraryNotice || deletedEntry ? (
+      {libraryNotice || deletedEntry ? (
         <div className="library-toast-region">
-          {importer.notice ? (
-            <div
-              className={`library-toast${
-                importer.notice.kind === 'error' ? ' is-error' : ''
-              }`}
-              role={importer.notice.kind === 'error' ? 'alert' : 'status'}
-            >
-              <div>
-                <strong>{importer.notice.message}</strong>
-                {importer.notice.detail ? (
-                  <span>{importer.notice.detail}</span>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                aria-label="关闭导入结果"
-                onClick={importer.clearNotice}
-              >
-                <X aria-hidden="true" size={17} />
-              </button>
-            </div>
-          ) : null}
           {libraryNotice ? (
-            <div
-              className={`library-toast${
-                libraryNotice.kind === 'error' ? ' is-error' : ''
-              }`}
-              role={libraryNotice.kind === 'error' ? 'alert' : 'status'}
-            >
-              <strong>{libraryNotice.message}</strong>
-              <button
-                type="button"
-                aria-label="关闭提示"
-                onClick={() => setLibraryNotice(undefined)}
-              >
-                <X aria-hidden="true" size={17} />
-              </button>
-            </div>
+            <LibraryAlert
+              notice={libraryNotice}
+              dismissLabel="关闭提示"
+              onDismiss={() => setLibraryNotice(undefined)}
+            />
           ) : null}
           {deletedEntry ? (
             <div className="library-toast delete-undo-toast" role="status">

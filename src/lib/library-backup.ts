@@ -1,9 +1,16 @@
 import JSZip from 'jszip'
 import {
+  getLibraryBackupConflicts,
   getLibraryBackupEntries,
   restoreLibraryBackupEntries,
 } from './book-storage'
+import { createBookFingerprint } from './book-fingerprint'
 import type { BookRecord, LibraryBackupEntry } from '../types/book'
+import type {
+  LibraryBackupConflict,
+  LibraryBackupConflictResolution,
+  RestoreLibraryBackupResult,
+} from './book-storage'
 
 const BACKUP_FORMAT = 'lento-library-backup'
 const BACKUP_VERSION = 1
@@ -24,8 +31,19 @@ interface BackupManifest {
 
 export interface LibraryBackupResult {
   bookCount: number
-  books?: BookRecord[]
 }
+
+export interface LibraryBackupPreview {
+  sourceName: string
+  exportedAt?: string
+  bookCount: number
+  totalBytes: number
+  directAddCount: number
+  conflicts: LibraryBackupConflict[]
+  entries: LibraryBackupEntry[]
+}
+
+export type { LibraryBackupConflictResolution }
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -180,9 +198,9 @@ export async function exportLibraryBackup(): Promise<LibraryBackupResult> {
   return { bookCount: entries.length }
 }
 
-export async function importLibraryBackup(
+export async function previewLibraryBackup(
   file: File,
-): Promise<LibraryBackupResult> {
+): Promise<LibraryBackupPreview> {
   let zip: JSZip
   try {
     zip = await JSZip.loadAsync(file)
@@ -209,9 +227,37 @@ export async function importLibraryBackup(
       if (data.byteLength === 0) {
         throw new Error(`《${record.title}》的书籍文件为空。`)
       }
-      return { book: record, data } satisfies LibraryBackupEntry
+      const fingerprint = await createBookFingerprint(data)
+      return {
+        book: {
+          ...record,
+          fileSize: data.byteLength,
+          fingerprint,
+        },
+        data,
+      } satisfies LibraryBackupEntry
     }),
   )
-  const books = await restoreLibraryBackupEntries(entries)
-  return { bookCount: entries.length, books }
+  const conflicts = await getLibraryBackupConflicts(entries)
+
+  return {
+    sourceName: file.name,
+    exportedAt: manifest.exportedAt || undefined,
+    bookCount: entries.length,
+    totalBytes: entries.reduce((total, entry) => total + entry.data.byteLength, 0),
+    directAddCount: entries.length - conflicts.length,
+    conflicts,
+    entries,
+  }
+}
+
+export async function restoreLibraryBackup(
+  preview: LibraryBackupPreview,
+  resolutions: ReadonlyMap<string, LibraryBackupConflictResolution>,
+): Promise<RestoreLibraryBackupResult> {
+  return restoreLibraryBackupEntries(
+    preview.entries,
+    preview.conflicts,
+    resolutions,
+  )
 }
