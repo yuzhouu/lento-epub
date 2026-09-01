@@ -1,9 +1,10 @@
-import { X } from 'lucide-react'
+import { ArrowLeft, PanelLeftClose } from 'lucide-react'
 import type { TocItem } from '../../types/book'
 
 interface TocPanelProps {
   items: TocItem[]
   currentHref?: string
+  onBack: () => void
   onClose: () => void
   onSelect: (href: string) => void
 }
@@ -27,7 +28,7 @@ function TocEntries({
         <button
           className={isCurrent ? 'toc-item is-current' : 'toc-item'}
           type="button"
-          style={{ paddingInlineStart: `${28 + depth * 16}px` }}
+          style={{ paddingInlineStart: `${14 + depth * 16}px` }}
           onClick={() => onSelect(item.href)}
         >
           {item.label.trim()}
@@ -50,18 +51,20 @@ function TocEntries({
 export function TocPanel({
   items,
   currentHref,
+  onBack,
   onClose,
   onSelect,
 }: TocPanelProps) {
   return (
     <aside className="toc-panel" aria-label="目录">
       <div className="toc-header">
-        <h2>目录</h2>
-        <button className="icon-button" type="button" onClick={onClose}>
-          <X aria-hidden="true" size={20} strokeWidth={1.5} />
+        <strong>卷舍</strong>
+        <button className="sidebar-toggle" type="button" onClick={onClose}>
+          <PanelLeftClose aria-hidden="true" size={19} strokeWidth={1.7} />
           <span className="visually-hidden">关闭目录</span>
         </button>
       </div>
+      <h2 className="toc-title">目录</h2>
       {items.length ? (
         <nav aria-label="章节目录">
           <ul className="toc-list">
@@ -75,6 +78,12 @@ export function TocPanel({
       ) : (
         <p className="toc-empty">正在整理目录…</p>
       )}
+      <div className="toc-footer">
+        <button type="button" onClick={onBack}>
+          <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.7} />
+          返回书架
+        </button>
+      </div>
     </aside>
   )
 }

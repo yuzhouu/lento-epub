@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import ePub from 'epubjs'
 import {
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   List,
+  PanelLeftOpen,
   Settings,
 } from 'lucide-react'
 import { getBookFile, updateBookReadingState } from '../../lib/book-storage'
@@ -38,15 +38,25 @@ const THEME_COLORS: Record<
   night: { background: '#202421', color: '#e6e1d5' },
 }
 
-const READER_FLOW_STORAGE_KEY = 'lento:reader-flow:v1'
+const READER_FLOW_STORAGE_KEY = 'lento:reader-flow:v2'
+const LEGACY_READER_FLOW_STORAGE_KEY = 'lento:reader-flow:v1'
 
 function getInitialReaderFlow(): ReaderFlow {
   try {
-    return localStorage.getItem(READER_FLOW_STORAGE_KEY) === 'paginated'
+    const savedFlow = localStorage.getItem(READER_FLOW_STORAGE_KEY)
+    if (
+      savedFlow === 'chapter' ||
+      savedFlow === 'continuous' ||
+      savedFlow === 'paginated'
+    ) {
+      return savedFlow
+    }
+
+    return localStorage.getItem(LEGACY_READER_FLOW_STORAGE_KEY) === 'paginated'
       ? 'paginated'
-      : 'scrolled'
+      : 'chapter'
   } catch {
-    return 'scrolled'
+    return 'chapter'
   }
 }
 
@@ -62,6 +72,60 @@ function findChapterLabel(
     if (nested) return nested
   }
   return undefined
+}
+
+function stripChapterFragment(href: string): string {
+  return href.split('#')[0]
+}
+
+function isSameChapterHref(currentHref: string, tocHref: string): boolean {
+  const currentPath = stripChapterFragment(currentHref)
+  const tocPath = stripChapterFragment(tocHref)
+  return (
+    currentPath === tocPath ||
+    currentPath.endsWith(tocPath) ||
+    tocPath.endsWith(currentPath)
+  )
+}
+
+function flattenToc(items: TocItem[]): TocItem[] {
+  return items.flatMap((item) => [
+    item,
+    ...(item.subitems ? flattenToc(item.subitems) : []),
+  ])
+}
+
+function findChapterNeighbors(
+  items: TocItem[],
+  currentHref: string,
+): { previous?: TocItem; next?: TocItem } {
+  const chapters = flattenToc(items)
+  const currentIndex = chapters.findIndex((item) =>
+    isSameChapterHref(currentHref, item.href),
+  )
+  if (currentIndex < 0) return {}
+
+  const next = chapters
+    .slice(currentIndex + 1)
+    .find((item) => !isSameChapterHref(currentHref, item.href))
+  let previous: TocItem | undefined
+  for (let index = currentIndex - 1; index >= 0; index -= 1) {
+    if (!isSameChapterHref(currentHref, chapters[index].href)) {
+      previous = chapters[index]
+      break
+    }
+  }
+
+  return { previous, next }
+}
+
+function getChapterProgress(location: ReaderLocation): number {
+  const displayed = location.start.displayed
+  if (!displayed || displayed.total <= 0) return 0
+  if (displayed.total === 1) return 1
+
+  const page = Math.max(1, Math.min(displayed.total, displayed.page))
+  return (page - 1) / (displayed.total - 1)
 }
 
 function registerReaderTheme(
@@ -114,10 +178,12 @@ export function ReaderPage({
   const [tocOpen, setTocOpen] = useState(() => window.innerWidth >= 980)
   const [currentHref, setCurrentHref] = useState<string>()
   const [chapterLabel, setChapterLabel] = useState(bookRecord.chapterLabel)
-  const [progress, setProgress] = useState(bookRecord.progress)
+  const [chapterProgress, setChapterProgress] = useState(0)
+  const [atChapterStart, setAtChapterStart] = useState(false)
+  const [atChapterEnd, setAtChapterEnd] = useState(false)
   const [fontSize, setFontSize] = useState(19)
   const [readerFlow, setReaderFlow] = useState<ReaderFlow>(getInitialReaderFlow)
-  const [theme, setTheme] = useState<ReaderTheme>('paper')
+  const [theme, setTheme] = useState<ReaderTheme>('light')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [error, setError] = useState<string>()
 
@@ -127,6 +193,9 @@ export function ReaderPage({
     if (currentBookIdRef.current !== bookRecord.id) {
       currentBookIdRef.current = bookRecord.id
       currentLocationRef.current = bookRecord.location
+      setChapterProgress(0)
+      setAtChapterStart(false)
+      setAtChapterEnd(false)
     }
     setError(undefined)
 
@@ -134,6 +203,7 @@ export function ReaderPage({
     let effectBook: EpubBook | null = null
     let effectRendition: EpubRendition | null = null
     let removeContentScrollBridge: (() => void) | undefined
+    let updateScrolledChapterProgress: (() => void) | undefined
     let persistTimer: ReturnType<typeof setTimeout> | undefined
     let pendingReadingState:
       | Pick<BookRecord, 'progress' | 'location' | 'chapterLabel'>
@@ -166,8 +236,8 @@ export function ReaderPage({
         const rendition = epubBook.renderTo(viewerElement, {
           width: '100%',
           height: '100%',
-          manager: readerFlow === 'scrolled' ? 'continuous' : 'default',
-          flow: readerFlow === 'scrolled' ? 'scrolled' : 'paginated',
+          manager: readerFlow === 'continuous' ? 'continuous' : 'default',
+          flow: readerFlow === 'paginated' ? 'paginated' : 'scrolled',
           spread: 'none',
         })
         effectBook = epubBook
@@ -175,9 +245,12 @@ export function ReaderPage({
         renditionRef.current = rendition
         registerReaderTheme(rendition, theme, fontSize)
 
-        if (readerFlow === 'scrolled') {
+        if (readerFlow !== 'paginated') {
           const contentDocuments = new Set<Document>()
+          const renderedViews = new Set<HTMLElement>()
           let lastTouchY: number | undefined
+          let scrollContainer: HTMLElement | undefined
+          let progressFrame: number | undefined
 
           function getScrollContainer() {
             return viewerElement.querySelector<HTMLElement>('.epub-container')
@@ -191,13 +264,76 @@ export function ReaderPage({
             if (container.scrollTop !== previousScrollTop) event.preventDefault()
           }
 
+          function scheduleChapterProgressUpdate() {
+            cancelAnimationFrame(progressFrame ?? 0)
+            progressFrame = requestAnimationFrame(() => {
+              const container = getScrollContainer()
+              if (!container) return
+
+              const views = [...renderedViews]
+                .filter((element) => element.isConnected)
+                .sort((a, b) => a.offsetTop - b.offsetTop)
+              const activeView =
+                views.find(
+                  (element) =>
+                    container.scrollTop < element.offsetTop + element.offsetHeight,
+                ) ?? views.at(-1)
+              if (!activeView) {
+                setAtChapterStart(false)
+                setAtChapterEnd(false)
+                return
+              }
+
+              const readableDistance = Math.max(
+                0,
+                activeView.offsetHeight - container.clientHeight,
+              )
+              if (readableDistance === 0) {
+                setChapterProgress(1)
+                setAtChapterStart(true)
+                setAtChapterEnd(true)
+                return
+              }
+
+              const chapterOffset = Math.max(
+                0,
+                Math.min(
+                  readableDistance,
+                  container.scrollTop - activeView.offsetTop,
+                ),
+              )
+              const nextChapterProgress = chapterOffset / readableDistance
+              setChapterProgress(nextChapterProgress)
+              setAtChapterStart(chapterOffset <= 1)
+              setAtChapterEnd(chapterOffset >= readableDistance - 1)
+            })
+          }
+
+          updateScrolledChapterProgress = scheduleChapterProgressUpdate
+
           function attachContentScrollBridge(
             _section: unknown,
-            view: { document?: Document },
+            view: { document?: Document; element?: HTMLElement },
           ) {
             const document = view.document
             if (!document || contentDocuments.has(document)) return
             contentDocuments.add(document)
+            if (view.element) renderedViews.add(view.element)
+
+            const container = getScrollContainer()
+            if (container && container !== scrollContainer) {
+              scrollContainer?.removeEventListener(
+                'scroll',
+                scheduleChapterProgressUpdate,
+              )
+              scrollContainer = container
+              scrollContainer.addEventListener(
+                'scroll',
+                scheduleChapterProgressUpdate,
+                { passive: true },
+              )
+            }
+            scheduleChapterProgressUpdate()
 
             document.addEventListener(
               'wheel',
@@ -248,7 +384,13 @@ export function ReaderPage({
           rendition.on('rendered', attachContentScrollBridge)
           removeContentScrollBridge = () => {
             rendition.off('rendered', attachContentScrollBridge)
+            scrollContainer?.removeEventListener(
+              'scroll',
+              scheduleChapterProgressUpdate,
+            )
+            cancelAnimationFrame(progressFrame ?? 0)
             contentDocuments.clear()
+            renderedViews.clear()
           }
         }
 
@@ -271,7 +413,14 @@ export function ReaderPage({
             location.start.href,
           )
           setCurrentHref(location.start.href)
-          setProgress(nextProgress)
+          if (readerFlow === 'paginated') {
+            const nextChapterProgress = getChapterProgress(location)
+            setChapterProgress(nextChapterProgress)
+            setAtChapterStart(nextChapterProgress <= 0)
+            setAtChapterEnd(nextChapterProgress >= 1)
+          } else {
+            updateScrolledChapterProgress?.()
+          }
           setChapterLabel(nextChapter)
           currentLocationRef.current = location.start.cfi
           pendingReadingState = {
@@ -317,11 +466,16 @@ export function ReaderPage({
   }, [fontSize, theme])
 
   function displayChapter(href: string) {
+    setChapterProgress(0)
+    setAtChapterStart(false)
+    setAtChapterEnd(false)
     void renditionRef.current?.display(href)
     if (window.innerWidth < 980) setTocOpen(false)
   }
 
   function handleReaderFlowChange(flow: ReaderFlow) {
+    setAtChapterStart(false)
+    setAtChapterEnd(false)
     setReaderFlow(flow)
     try {
       localStorage.setItem(READER_FLOW_STORAGE_KEY, flow)
@@ -330,49 +484,86 @@ export function ReaderPage({
     }
   }
 
-  const percent = Math.round(progress * 100)
+  const chapterPercent = Math.round(chapterProgress * 100)
+  const chapterNeighbors = currentHref
+    ? findChapterNeighbors(toc, currentHref)
+    : {}
+  const previousChapter = chapterNeighbors.previous
+  const nextChapter = chapterNeighbors.next
+  const shouldOfferPreviousChapter =
+    readerFlow === 'chapter' && atChapterStart && Boolean(previousChapter)
+  const shouldOfferNextChapter =
+    readerFlow !== 'continuous' && atChapterEnd && Boolean(nextChapter)
+
+  function handleForward() {
+    if (atChapterEnd && nextChapter) {
+      displayChapter(nextChapter.href)
+      return
+    }
+    void renditionRef.current?.next()
+  }
 
   return (
     <main className={`reader-page theme-${theme}`}>
       <div className={tocOpen ? 'reader-layout toc-is-open' : 'reader-layout'}>
         {tocOpen ? (
-          <TocPanel
-            items={toc}
-            currentHref={currentHref}
-            onClose={() => setTocOpen(false)}
-            onSelect={displayChapter}
-          />
+          <>
+            <TocPanel
+              items={toc}
+              currentHref={currentHref}
+              onBack={onBack}
+              onClose={() => setTocOpen(false)}
+              onSelect={displayChapter}
+            />
+            <button
+              className="toc-backdrop"
+              type="button"
+              aria-label="关闭目录"
+              onClick={() => setTocOpen(false)}
+            />
+          </>
         ) : null}
 
         <section className="reader-main">
           <header className="reader-header">
-            <button className="back-button" type="button" onClick={onBack}>
-              <ArrowLeft aria-hidden="true" size={19} strokeWidth={1.5} />
-              返回书架
-            </button>
-            <div className="reader-position" aria-live="polite">
+            <div className="reader-context" aria-live="polite">
+              {!tocOpen ? (
+                <button
+                  className="sidebar-toggle"
+                  type="button"
+                  onClick={() => setTocOpen(true)}
+                >
+                  <PanelLeftOpen
+                    aria-hidden="true"
+                    size={19}
+                    strokeWidth={1.7}
+                  />
+                  <span className="visually-hidden">打开目录</span>
+                </button>
+              ) : null}
               <strong>{bookRecord.title}</strong>
+              <span aria-hidden="true">/</span>
               <span>{chapterLabel || '正在打开…'}</span>
             </div>
             <div className="reader-tools">
               <button
-                className="icon-button"
+                className="reader-tool-button"
                 type="button"
                 aria-pressed={tocOpen}
                 onClick={() => setTocOpen((open) => !open)}
               >
-                <List aria-hidden="true" size={22} strokeWidth={1.5} />
-                <span className="visually-hidden">打开目录</span>
+                <List aria-hidden="true" size={18} strokeWidth={1.7} />
+                <span>目录</span>
               </button>
               <div className="settings-anchor">
                 <button
-                  className="icon-button"
+                  className="reader-tool-button"
                   type="button"
                   aria-expanded={settingsOpen}
                   onClick={() => setSettingsOpen((open) => !open)}
                 >
-                  <Settings aria-hidden="true" size={21} strokeWidth={1.5} />
-                  <span className="visually-hidden">阅读设置</span>
+                  <Settings aria-hidden="true" size={18} strokeWidth={1.7} />
+                  <span>阅读设置</span>
                 </button>
                 {settingsOpen ? (
                   <ReaderSettings
@@ -403,12 +594,18 @@ export function ReaderPage({
           </div>
 
           <footer
-            className={
+            className={`reader-footer${
+              readerFlow === 'paginated' ? ' is-paginated' : ''
+            }${shouldOfferPreviousChapter ? ' is-chapter-start' : ''}${
+              shouldOfferNextChapter ? ' is-chapter-end' : ''
+            }`}
+            aria-label={
               readerFlow === 'paginated'
-                ? 'reader-footer is-paginated'
-                : 'reader-footer'
+                ? '阅读进度与翻页'
+                : shouldOfferPreviousChapter || shouldOfferNextChapter
+                  ? '阅读进度与章节导航'
+                  : '阅读进度'
             }
-            aria-label={`阅读进度 ${percent}%`}
           >
             {readerFlow === 'paginated' ? (
               <button
@@ -418,20 +615,66 @@ export function ReaderPage({
                 <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.5} />
                 上一页
               </button>
+            ) : shouldOfferPreviousChapter && previousChapter ? (
+              <button
+                className="chapter-previous-button"
+                type="button"
+                aria-label={`进入上一章：${previousChapter.label}`}
+                onClick={() => displayChapter(previousChapter.href)}
+              >
+                <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.5} />
+                上一章
+                <span className="chapter-boundary-label">
+                  · {previousChapter.label}
+                </span>
+              </button>
             ) : null}
-            <span>{percent}%</span>
+            <span
+              className="reader-chapter-progress"
+              aria-label={`本章进度 ${chapterPercent}%`}
+            >
+              {chapterPercent}%
+            </span>
             {readerFlow === 'paginated' ? (
               <button
+                className={shouldOfferNextChapter ? 'chapter-next-button' : ''}
                 type="button"
-                onClick={() => void renditionRef.current?.next()}
+                aria-label={
+                  atChapterEnd && nextChapter
+                    ? `进入下一章：${nextChapter.label}`
+                    : '下一页'
+                }
+                onClick={handleForward}
               >
-                下一页
+                {atChapterEnd && nextChapter ? (
+                  <>
+                    下一章
+                    <span className="chapter-boundary-label">
+                      · {nextChapter.label}
+                    </span>
+                  </>
+                ) : (
+                  '下一页'
+                )}
+                <ChevronRight aria-hidden="true" size={18} strokeWidth={1.5} />
+              </button>
+            ) : shouldOfferNextChapter && nextChapter ? (
+              <button
+                className="chapter-next-button"
+                type="button"
+                aria-label={`进入下一章：${nextChapter.label}`}
+                onClick={() => displayChapter(nextChapter.href)}
+              >
+                下一章
+                <span className="chapter-boundary-label">
+                  · {nextChapter.label}
+                </span>
                 <ChevronRight aria-hidden="true" size={18} strokeWidth={1.5} />
               </button>
             ) : null}
           </footer>
           <div className="reader-progress" aria-hidden="true">
-            <span style={{ width: `${percent}%` }} />
+            <span style={{ width: `${chapterPercent}%` }} />
           </div>
         </section>
       </div>

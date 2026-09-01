@@ -1,7 +1,7 @@
 import { Minus, Moon, Plus, Sun } from 'lucide-react'
 
 export type ReaderTheme = 'paper' | 'light' | 'night'
-export type ReaderFlow = 'scrolled' | 'paginated'
+export type ReaderFlow = 'chapter' | 'continuous' | 'paginated'
 
 interface ReaderSettingsProps {
   fontSize: number
@@ -53,19 +53,30 @@ export function ReaderSettings({
         </div>
       </div>
       <div className="settings-row flow-settings-row">
-        <span>翻页</span>
-        <div className="flow-options" aria-label="翻页方式">
+        <span>阅读方式</span>
+        <div className="flow-options" aria-label="阅读方式">
           <button
-            className={flow === 'scrolled' ? 'is-selected' : undefined}
+            className={flow === 'chapter' ? 'is-selected' : undefined}
             type="button"
-            aria-pressed={flow === 'scrolled'}
-            onClick={() => onFlowChange('scrolled')}
+            aria-label="逐章滚动"
+            aria-pressed={flow === 'chapter'}
+            onClick={() => onFlowChange('chapter')}
           >
-            滚动
+            逐章
+          </button>
+          <button
+            className={flow === 'continuous' ? 'is-selected' : undefined}
+            type="button"
+            aria-label="连续滚动"
+            aria-pressed={flow === 'continuous'}
+            onClick={() => onFlowChange('continuous')}
+          >
+            连续
           </button>
           <button
             className={flow === 'paginated' ? 'is-selected' : undefined}
             type="button"
+            aria-label="分页阅读"
             aria-pressed={flow === 'paginated'}
             onClick={() => onFlowChange('paginated')}
           >

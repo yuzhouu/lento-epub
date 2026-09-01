@@ -28,5 +28,9 @@ export interface ReaderLocation {
     cfi: string
     href: string
     percentage?: number
+    displayed?: {
+      page: number
+      total: number
+    }
   }
 }
