@@ -10,6 +10,12 @@ import {
 import { getBookFile, updateBookReadingState } from '../../lib/book-storage'
 import { sanitizeEpubFontSources } from '../../lib/epub-font-sanitizer'
 import {
+  DEFAULT_READER_FONT,
+  getReaderFontFamily,
+  parseStoredReaderFont,
+  type ReaderFont,
+} from '../../lib/reader-font'
+import {
   ReaderSettings,
   type ReaderFlow,
   type ReaderTheme,
@@ -41,11 +47,26 @@ const THEME_COLORS: Record<
 
 const READER_FLOW_STORAGE_KEY = 'lento:reader-flow:v2'
 const LEGACY_READER_FLOW_STORAGE_KEY = 'lento:reader-flow:v1'
+const READER_FONT_STORAGE_KEY = 'lento:reader-font:v2'
+const LEGACY_READER_FONT_STORAGE_KEY = 'lento:reader-font:v1'
 const READER_FONT_SIZE_STORAGE_KEY = 'lento:reader-font-size:v1'
 const READER_THEME_STORAGE_KEY = 'lento:reader-theme:v1'
 const DEFAULT_READER_FONT_SIZE = 18
 const MIN_READER_FONT_SIZE = 15
 const MAX_READER_FONT_SIZE = 26
+
+function getInitialReaderFont(): ReaderFont {
+  try {
+    return parseStoredReaderFont(
+      localStorage.getItem(READER_FONT_STORAGE_KEY),
+      localStorage.getItem(LEGACY_READER_FONT_STORAGE_KEY),
+    )
+  } catch {
+    // Fall back to the current reader default when local storage is unavailable.
+  }
+
+  return DEFAULT_READER_FONT
+}
 
 function getInitialReaderFontSize(): number {
   try {
@@ -173,16 +194,28 @@ function getChapterProgress(location: ReaderLocation): number {
 function registerReaderTheme(
   rendition: EpubRendition,
   theme: ReaderTheme,
+  font: ReaderFont,
   fontSize: number,
   flow: ReaderFlow,
 ) {
   const colors = THEME_COLORS[theme]
+  const fontFamily = getReaderFontFamily(font)
+
+  // EPUB.js appends rules when a named theme is updated. Recreate its style
+  // node so selecting “原书” can genuinely remove a previous font override.
+  const contents = rendition.getContents() as unknown as Array<{
+    document?: Document
+  }>
+  contents.forEach((content) => {
+    content.document
+      ?.getElementById('epubjs-inserted-css-lento')
+      ?.remove()
+  })
+
   rendition.themes.register('lento', {
     body: {
       color: `${colors.color} !important`,
       background: `${colors.background} !important`,
-      'font-family':
-        '"Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif !important',
       'line-height': '2.05 !important',
       padding:
         flow === 'paginated'
@@ -196,6 +229,13 @@ function registerReaderTheme(
           }
         : {}),
     },
+    ...(fontFamily
+      ? {
+          'body, p, div, span, li, td, th, blockquote, h1, h2, h3, h4, h5, h6': {
+            'font-family': `${fontFamily} !important`,
+          },
+        }
+      : {}),
     p: {
       'font-size': `${fontSize}px !important`,
       'line-height': '2.05 !important',
@@ -235,6 +275,7 @@ export function ReaderPage({
   const [chapterProgress, setChapterProgress] = useState(0)
   const [atChapterStart, setAtChapterStart] = useState(false)
   const [atChapterEnd, setAtChapterEnd] = useState(false)
+  const [font, setFont] = useState<ReaderFont>(getInitialReaderFont)
   const [fontSize, setFontSize] = useState(getInitialReaderFontSize)
   const [readerFlow, setReaderFlow] = useState<ReaderFlow>(getInitialReaderFlow)
   const [theme, setTheme] = useState<ReaderTheme>(getInitialReaderTheme)
@@ -336,7 +377,7 @@ export function ReaderPage({
         })
         effectRendition = rendition
         renditionRef.current = rendition
-        registerReaderTheme(rendition, theme, fontSize, readerFlow)
+        registerReaderTheme(rendition, theme, font, fontSize, readerFlow)
 
         const settingsDocuments = new Set<Document>()
         function attachSettingsDismissal(
@@ -621,8 +662,10 @@ export function ReaderPage({
 
   useEffect(() => {
     const rendition = renditionRef.current
-    if (rendition) registerReaderTheme(rendition, theme, fontSize, readerFlow)
-  }, [fontSize, readerFlow, theme])
+    if (rendition) {
+      registerReaderTheme(rendition, theme, font, fontSize, readerFlow)
+    }
+  }, [font, fontSize, readerFlow, theme])
 
   function displayChapter(href: string) {
     setChapterProgress(0)
@@ -647,6 +690,15 @@ export function ReaderPage({
     setFontSize(size)
     try {
       localStorage.setItem(READER_FONT_SIZE_STORAGE_KEY, String(size))
+    } catch {
+      // Reading still works when local storage is unavailable.
+    }
+  }
+
+  function handleFontChange(nextFont: ReaderFont) {
+    setFont(nextFont)
+    try {
+      localStorage.setItem(READER_FONT_STORAGE_KEY, JSON.stringify(nextFont))
     } catch {
       // Reading still works when local storage is unavailable.
     }
@@ -744,9 +796,11 @@ export function ReaderPage({
                 </button>
                 {settingsOpen ? (
                   <ReaderSettings
+                    font={font}
                     fontSize={fontSize}
                     flow={readerFlow}
                     theme={theme}
+                    onFontChange={handleFontChange}
                     onFontSizeChange={handleFontSizeChange}
                     onFlowChange={handleReaderFlowChange}
                     onThemeChange={handleThemeChange}

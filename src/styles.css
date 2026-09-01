@@ -689,10 +689,305 @@ button:focus-visible,
   font-size: 12px;
 }
 
+.font-settings-row,
 .flow-settings-row {
   margin-top: 15px;
   padding-top: 15px;
   border-top: 1px solid rgba(35, 49, 43, 0.1);
+}
+
+.font-settings-row {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.font-options {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.font-options button {
+  min-height: 40px;
+  border: 1px solid rgba(35, 49, 43, 0.13);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.font-options button.is-selected {
+  border-color: #47705e;
+  color: #2f6a52;
+  background: rgba(49, 93, 75, 0.06);
+}
+
+.font-options .font-serif {
+  font-family: "Songti SC", STSong, "Noto Serif CJK SC", Georgia, serif;
+}
+
+.font-options .font-sans {
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+
+.font-options .font-kai {
+  font-family: "Kaiti SC", STKaiti, KaiTi, serif;
+}
+
+.local-font-controls {
+  width: 100%;
+  display: grid;
+  gap: 7px;
+}
+
+.local-font-summary {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 82px;
+  overflow: hidden;
+  border: 1px solid rgba(35, 49, 43, 0.13);
+  border-radius: 8px;
+}
+
+.discover-fonts-button,
+.local-font-picker-toggle {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid rgba(35, 49, 43, 0.13);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+}
+
+.discover-fonts-button {
+  cursor: pointer;
+}
+
+.local-font-summary .local-font-picker-toggle {
+  border: 0;
+  border-radius: 0;
+}
+
+.local-font-refresh-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 0;
+  border-left: 1px solid rgba(35, 49, 43, 0.13);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.local-font-refresh-button:hover {
+  background: var(--reader-hover, rgba(49, 93, 75, 0.06));
+}
+
+.local-font-refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.local-font-refresh-button > span {
+  display: grid;
+  gap: 1px;
+  text-align: left;
+}
+
+.local-font-refresh-button strong {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.local-font-refresh-button small {
+  color: var(--reader-muted, #69726d);
+  font-size: 10px;
+}
+
+.discover-fonts-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.local-font-picker-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 54px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.local-font-picker-toggle > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.local-font-picker-toggle strong,
+.local-font-picker-toggle small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-font-picker-toggle strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.local-font-picker-toggle small {
+  color: var(--reader-muted, #69726d);
+  font-size: 11px;
+}
+
+.local-font-picker-toggle small.local-font-picker-toggle-preview {
+  display: block;
+  white-space: nowrap;
+}
+
+.local-font-picker-toggle svg {
+  flex: 0 0 auto;
+  transition: transform 140ms ease;
+}
+
+.local-font-picker-toggle svg.is-open {
+  transform: rotate(180deg);
+}
+
+.local-font-picker {
+  overflow: hidden;
+  border: 1px solid rgba(35, 49, 43, 0.13);
+  border-radius: 8px;
+}
+
+.local-font-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(35, 49, 43, 0.1);
+}
+
+.local-font-search svg {
+  position: absolute;
+  left: 10px;
+  color: var(--reader-muted, #69726d);
+  pointer-events: none;
+}
+
+.local-font-search input {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px 0 32px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+}
+
+.local-font-list {
+  max-height: 230px;
+  display: grid;
+  gap: 3px;
+  padding: 4px;
+  overflow-y: auto;
+}
+
+.local-font-choice {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  content-visibility: auto;
+}
+
+.local-font-choice:hover,
+.local-font-choice.is-selected {
+  border-color: var(--reader-border, rgba(35, 49, 43, 0.13));
+  background: var(--reader-hover, rgba(49, 93, 75, 0.06));
+}
+
+.local-font-preview,
+.local-font-name,
+.local-font-technical-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-font-preview {
+  display: block;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.local-font-name {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.local-font-technical-name {
+  color: var(--reader-muted, #69726d);
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.local-font-empty {
+  padding: 22px 10px;
+  color: var(--reader-muted, #69726d);
+  font-size: 11px;
+  text-align: center;
+}
+
+.local-font-list-footer {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 9px;
+  border-top: 1px solid rgba(35, 49, 43, 0.1);
+  color: var(--reader-muted, #69726d);
+  font-size: 10px;
+}
+
+.local-font-list-footer button {
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.font-discovery-message {
+  min-height: 0;
+  color: var(--reader-muted, #69726d);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.font-discovery-message:empty {
+  display: none;
 }
 
 .flow-options {
@@ -1326,13 +1621,15 @@ button:focus-visible,
 
 .settings-popover {
   top: calc(100% + 10px);
-  width: 276px;
+  width: 360px;
   padding: 18px;
   border-color: var(--reader-border);
   border-radius: 14px;
   background: var(--reader-surface);
   color: var(--reader-text);
   box-shadow: 0 18px 48px rgba(20, 22, 20, 0.12);
+  max-height: calc(100svh - 76px);
+  overflow-y: auto;
 }
 
 .theme-paper .settings-popover,
@@ -1344,6 +1641,10 @@ button:focus-visible,
 
 .font-stepper,
 .flow-options,
+.font-options button,
+.discover-fonts-button,
+.local-font-summary,
+.local-font-picker-toggle,
 .theme-options button {
   border-color: var(--reader-border);
   border-radius: 8px;
@@ -1353,6 +1654,7 @@ button:focus-visible,
   border-color: var(--reader-border);
 }
 
+.font-settings-row,
 .flow-settings-row {
   border-color: var(--reader-border);
 }
@@ -1372,6 +1674,12 @@ button:focus-visible,
 }
 
 .theme-options button.is-selected {
+  border-color: currentColor;
+  color: inherit;
+  background: var(--reader-hover);
+}
+
+.font-options button.is-selected {
   border-color: currentColor;
   color: inherit;
   background: var(--reader-hover);
@@ -1517,7 +1825,7 @@ button:focus-visible,
   }
 
   .settings-popover {
-    width: min(276px, calc(100vw - 24px));
+    width: min(360px, calc(100vw - 24px));
   }
 
   .reader-stage {

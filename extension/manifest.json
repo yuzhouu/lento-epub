@@ -21,6 +21,7 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "optional_permissions": ["fontSettings"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' blob: data:;"
   }
