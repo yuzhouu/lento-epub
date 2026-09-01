@@ -703,6 +703,7 @@ button:focus-visible,
 }
 
 .reader-stage {
+  position: relative;
   height: calc(100vh - 134px);
   display: flex;
   justify-content: center;
@@ -717,6 +718,52 @@ button:focus-visible,
 .epub-viewer > div,
 .epub-viewer iframe {
   background: transparent !important;
+}
+
+.reader-loading {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--reader-surface, var(--paper));
+  color: var(--reader-muted, var(--muted));
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.reader-loading strong {
+  margin-top: 4px;
+  color: var(--reader-text, var(--ink));
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.reader-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--reader-border, var(--line));
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: reader-loading-spin 850ms linear infinite;
+}
+
+@keyframes reader-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-loading-spinner {
+    animation: none;
+    border-top-color: var(--reader-border, var(--line));
+  }
 }
 
 .reader-footer {

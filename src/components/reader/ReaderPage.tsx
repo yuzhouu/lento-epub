@@ -196,6 +196,8 @@ export function ReaderPage({
   const [readerFlow, setReaderFlow] = useState<ReaderFlow>(getInitialReaderFlow)
   const [theme, setTheme] = useState<ReaderTheme>('light')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [isOpening, setIsOpening] = useState(true)
+  const [openingMessage, setOpeningMessage] = useState('正在读取书籍…')
   const [error, setError] = useState<string>()
 
   useEffect(() => {
@@ -209,12 +211,17 @@ export function ReaderPage({
       setAtChapterEnd(false)
     }
     setError(undefined)
+    setIsOpening(true)
+    setOpeningMessage('正在读取书籍…')
 
     let isCancelled = false
+    let locationsReady = false
     let effectBook: EpubBook | null = null
     let effectRendition: EpubRendition | null = null
     let removeContentScrollBridge: (() => void) | undefined
+    let removeRelocationListener: (() => void) | undefined
     let updateScrolledChapterProgress: (() => void) | undefined
+    let currentChapterLabel = bookRecord.chapterLabel
     let persistTimer: ReturnType<typeof setTimeout> | undefined
     let pendingReadingState:
       | Pick<BookRecord, 'progress' | 'location' | 'chapterLabel'>
@@ -242,6 +249,7 @@ export function ReaderPage({
         const data = await getBookFile(bookRecord.id)
         if (!data) throw new Error('找不到原始 EPUB 文件。')
         if (isCancelled) return
+        setOpeningMessage('正在排版正文…')
 
         const epubBook = ePub(data.slice(0))
         const rendition = epubBook.renderTo(viewerElement, {
@@ -411,14 +419,16 @@ export function ReaderPage({
         tocRef.current = navigationItems
         setToc(navigationItems)
 
-        await epubBook.locations.generate(1200)
-        if (isCancelled) return
-
-        rendition.on('relocated', (location: ReaderLocation) => {
-          const nextProgress = Math.max(
-            0,
-            Math.min(1, epubBook.locations.percentageFromCfi(location.start.cfi)),
-          )
+        function handleRelocated(location: ReaderLocation) {
+          const nextProgress = locationsReady
+            ? Math.max(
+                0,
+                Math.min(
+                  1,
+                  epubBook.locations.percentageFromCfi(location.start.cfi),
+                ),
+              )
+            : bookRecord.progress
           const nextChapter = findChapterLabel(
             tocRef.current,
             location.start.href,
@@ -433,6 +443,7 @@ export function ReaderPage({
             updateScrolledChapterProgress?.()
           }
           setChapterLabel(nextChapter)
+          currentChapterLabel = nextChapter
           currentLocationRef.current = location.start.cfi
           pendingReadingState = {
             location: location.start.cfi,
@@ -441,11 +452,46 @@ export function ReaderPage({
           }
           clearTimeout(persistTimer)
           persistTimer = setTimeout(persistReadingState, 350)
-        })
+        }
+        rendition.on('relocated', handleRelocated)
+        removeRelocationListener = () => {
+          rendition.off('relocated', handleRelocated)
+        }
 
         await rendition.display(currentLocationRef.current)
+        if (isCancelled) return
+        setIsOpening(false)
+
+        // Location generation walks the whole book and can be slow for large
+        // EPUBs. It is only needed for whole-book progress, so keep it off the
+        // critical path that renders the saved reading location.
+        try {
+          await epubBook.locations.generate(1200)
+          if (isCancelled) return
+          locationsReady = true
+
+          const currentLocation = currentLocationRef.current
+          if (currentLocation) {
+            pendingReadingState = {
+              location: currentLocation,
+              progress: Math.max(
+                0,
+                Math.min(
+                  1,
+                  epubBook.locations.percentageFromCfi(currentLocation),
+                ),
+              ),
+              chapterLabel: currentChapterLabel,
+            }
+            clearTimeout(persistTimer)
+            persistTimer = setTimeout(persistReadingState, 350)
+          }
+        } catch {
+          // The book remains readable even if its global progress cannot be indexed.
+        }
       } catch (readerError) {
         if (!isCancelled) {
+          setIsOpening(false)
           setError(
             readerError instanceof Error
               ? readerError.message
@@ -462,6 +508,7 @@ export function ReaderPage({
       clearTimeout(persistTimer)
       persistReadingState()
       removeContentScrollBridge?.()
+      removeRelocationListener?.()
       effectRendition?.destroy()
       effectBook?.destroy()
       if (renditionRef.current === effectRendition) {
@@ -596,6 +643,7 @@ export function ReaderPage({
                 ? 'reader-stage'
                 : 'reader-stage is-scroll-flow'
             }
+            aria-busy={isOpening}
           >
             {error ? (
               <div className="reader-error" role="alert">
@@ -606,7 +654,20 @@ export function ReaderPage({
                 </button>
               </div>
             ) : (
-              <div ref={viewerRef} className="epub-viewer" />
+              <>
+                <div ref={viewerRef} className="epub-viewer" />
+                {isOpening ? (
+                  <div
+                    className="reader-loading"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span className="reader-loading-spinner" aria-hidden="true" />
+                    <strong>{openingMessage}</strong>
+                    <span>较大的书籍可能需要一点时间</span>
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
 
