@@ -40,6 +40,30 @@ const THEME_COLORS: Record<
 
 const READER_FLOW_STORAGE_KEY = 'lento:reader-flow:v2'
 const LEGACY_READER_FLOW_STORAGE_KEY = 'lento:reader-flow:v1'
+const READER_FONT_SIZE_STORAGE_KEY = 'lento:reader-font-size:v1'
+const READER_THEME_STORAGE_KEY = 'lento:reader-theme:v1'
+const DEFAULT_READER_FONT_SIZE = 18
+const MIN_READER_FONT_SIZE = 15
+const MAX_READER_FONT_SIZE = 26
+
+function getInitialReaderFontSize(): number {
+  try {
+    const savedFontSize = Number(
+      localStorage.getItem(READER_FONT_SIZE_STORAGE_KEY),
+    )
+    if (
+      Number.isInteger(savedFontSize) &&
+      savedFontSize >= MIN_READER_FONT_SIZE &&
+      savedFontSize <= MAX_READER_FONT_SIZE
+    ) {
+      return savedFontSize
+    }
+  } catch {
+    // Fall back to the default when local storage is unavailable.
+  }
+
+  return DEFAULT_READER_FONT_SIZE
+}
 
 function getInitialReaderFlow(): ReaderFlow {
   try {
@@ -58,6 +82,23 @@ function getInitialReaderFlow(): ReaderFlow {
   } catch {
     return 'chapter'
   }
+}
+
+function getInitialReaderTheme(): ReaderTheme {
+  try {
+    const savedTheme = localStorage.getItem(READER_THEME_STORAGE_KEY)
+    if (
+      savedTheme === 'paper' ||
+      savedTheme === 'light' ||
+      savedTheme === 'night'
+    ) {
+      return savedTheme
+    }
+  } catch {
+    // Fall back to the default when local storage is unavailable.
+  }
+
+  return 'light'
 }
 
 function findChapterLabel(
@@ -192,9 +233,9 @@ export function ReaderPage({
   const [chapterProgress, setChapterProgress] = useState(0)
   const [atChapterStart, setAtChapterStart] = useState(false)
   const [atChapterEnd, setAtChapterEnd] = useState(false)
-  const [fontSize, setFontSize] = useState(19)
+  const [fontSize, setFontSize] = useState(getInitialReaderFontSize)
   const [readerFlow, setReaderFlow] = useState<ReaderFlow>(getInitialReaderFlow)
-  const [theme, setTheme] = useState<ReaderTheme>('light')
+  const [theme, setTheme] = useState<ReaderTheme>(getInitialReaderTheme)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [isOpening, setIsOpening] = useState(true)
   const [openingMessage, setOpeningMessage] = useState('正在读取书籍…')
@@ -542,6 +583,24 @@ export function ReaderPage({
     }
   }
 
+  function handleFontSizeChange(size: number) {
+    setFontSize(size)
+    try {
+      localStorage.setItem(READER_FONT_SIZE_STORAGE_KEY, String(size))
+    } catch {
+      // Reading still works when local storage is unavailable.
+    }
+  }
+
+  function handleThemeChange(nextTheme: ReaderTheme) {
+    setTheme(nextTheme)
+    try {
+      localStorage.setItem(READER_THEME_STORAGE_KEY, nextTheme)
+    } catch {
+      // Reading still works when local storage is unavailable.
+    }
+  }
+
   const chapterPercent = Math.round(chapterProgress * 100)
   const chapterNeighbors = currentHref
     ? findChapterNeighbors(toc, currentHref)
@@ -628,9 +687,9 @@ export function ReaderPage({
                     fontSize={fontSize}
                     flow={readerFlow}
                     theme={theme}
-                    onFontSizeChange={setFontSize}
+                    onFontSizeChange={handleFontSizeChange}
                     onFlowChange={handleReaderFlowChange}
-                    onThemeChange={setTheme}
+                    onThemeChange={handleThemeChange}
                   />
                 ) : null}
               </div>
