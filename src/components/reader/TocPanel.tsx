@@ -1,4 +1,4 @@
-import { ArrowLeft, PanelLeftClose } from 'lucide-react'
+import { ArrowLeft, List, PanelLeftClose, Search } from 'lucide-react'
 import type { TocItem } from '../../types/book'
 
 interface TocPanelProps {
@@ -6,6 +6,7 @@ interface TocPanelProps {
   currentHref?: string
   onBack: () => void
   onClose: () => void
+  onSearch: () => void
   onSelect: (href: string) => void
 }
 
@@ -53,6 +54,7 @@ export function TocPanel({
   currentHref,
   onBack,
   onClose,
+  onSearch,
   onSelect,
 }: TocPanelProps) {
   return (
@@ -64,7 +66,16 @@ export function TocPanel({
           <span className="visually-hidden">关闭目录</span>
         </button>
       </div>
-      <h2 className="toc-title">目录</h2>
+      <div className="navigation-tabs" aria-label="书内导航">
+        <button className="is-active" type="button" aria-current="page">
+          <List aria-hidden="true" size={15} strokeWidth={1.7} />
+          目录
+        </button>
+        <button type="button" onClick={onSearch}>
+          <Search aria-hidden="true" size={15} strokeWidth={1.7} />
+          搜索
+        </button>
+      </div>
       {items.length ? (
         <nav aria-label="章节目录">
           <ul className="toc-list">

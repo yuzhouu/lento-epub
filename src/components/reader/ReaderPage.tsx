@@ -5,6 +5,7 @@ import {
   ChevronRight,
   List,
   PanelLeftOpen,
+  Search,
   Settings,
 } from 'lucide-react'
 import { getBookFile, updateBookReadingState } from '../../lib/book-storage'
@@ -23,6 +24,10 @@ import {
   type ReaderTheme,
   type ReaderWidth,
 } from './ReaderSettings'
+import {
+  BookSearchPanel,
+  type BookSearchResult,
+} from './BookSearchPanel'
 import { TocPanel } from './TocPanel'
 import type {
   BookRecord,
@@ -32,6 +37,8 @@ import type {
 
 type EpubBook = ReturnType<typeof ePub>
 type EpubRendition = ReturnType<EpubBook['renderTo']>
+type EpubSection = ReturnType<EpubBook['spine']['get']>
+type NavigationPanel = 'toc' | 'search'
 
 interface ReaderPageProps {
   bookRecord: BookRecord
@@ -237,7 +244,7 @@ function findChapterLabel(
   href: string,
 ): string | undefined {
   for (const item of items) {
-    if (href === item.href || href.endsWith(item.href)) return item.label.trim()
+    if (isSameChapterHref(href, item.href)) return item.label.trim()
     const nested = item.subitems
       ? findChapterLabel(item.subitems, href)
       : undefined
@@ -289,6 +296,54 @@ function findChapterNeighbors(
   }
 
   return { previous, next }
+}
+
+function findSectionMatches(
+  section: EpubSection,
+  query: string,
+): Array<{ cfi: string; excerpt: string }> {
+  const root =
+    section.document.querySelector('body') ?? section.document.documentElement
+  const walker = section.document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const normalizedQuery = query.toLocaleLowerCase()
+  const matches: Array<{ cfi: string; excerpt: string }> = []
+  let node = walker.nextNode()
+
+  while (node) {
+    const parent = node.parentElement
+    const text = node.textContent ?? ''
+    if (
+      text.trim() &&
+      !parent?.closest('script, style, noscript, svg, [aria-hidden="true"]')
+    ) {
+      const normalizedText = text.toLocaleLowerCase()
+      let matchIndex = normalizedText.indexOf(normalizedQuery)
+      while (matchIndex >= 0) {
+        const range = section.document.createRange()
+        range.setStart(node, matchIndex)
+        range.setEnd(node, matchIndex + query.length)
+        const excerptStart = Math.max(0, matchIndex - 70)
+        const excerptEnd = Math.min(
+          text.length,
+          matchIndex + query.length + 70,
+        )
+        matches.push({
+          cfi: section.cfiFromRange(range),
+          excerpt: `${excerptStart > 0 ? '…' : ''}${text.slice(
+            excerptStart,
+            excerptEnd,
+          )}${excerptEnd < text.length ? '…' : ''}`,
+        })
+        matchIndex = normalizedText.indexOf(
+          normalizedQuery,
+          matchIndex + query.length,
+        )
+      }
+    }
+    node = walker.nextNode()
+  }
+
+  return matches
 }
 
 function getChapterProgress(location: ReaderLocation): number {
@@ -390,6 +445,12 @@ export function ReaderPage({
   const viewerRef = useRef<HTMLDivElement>(null)
   const settingsAnchorRef = useRef<HTMLDivElement>(null)
   const renditionRef = useRef<EpubRendition | null>(null)
+  const searchSourceRef = useRef<
+    { bookId: string; data: ArrayBuffer } | undefined
+  >(undefined)
+  const searchBookRef = useRef<
+    { bookId: string; book: EpubBook } | undefined
+  >(undefined)
   const keyboardPaginationRef = useRef(true)
   const paginationNavigationRef = useRef<
     (direction: 'previous' | 'next') => void
@@ -399,6 +460,8 @@ export function ReaderPage({
   const currentBookIdRef = useRef(bookRecord.id)
   const [toc, setToc] = useState<TocItem[]>([])
   const [tocOpen, setTocOpen] = useState(() => window.innerWidth >= 980)
+  const [navigationPanel, setNavigationPanel] =
+    useState<NavigationPanel>('toc')
   const [currentHref, setCurrentHref] = useState<string>()
   const [chapterLabel, setChapterLabel] = useState(bookRecord.chapterLabel)
   const [chapterProgress, setChapterProgress] = useState(0)
@@ -430,6 +493,18 @@ export function ReaderPage({
   keyboardPaginationRef.current = keyboardPagination
 
   useEffect(() => {
+    return () => {
+      if (searchBookRef.current?.bookId === bookRecord.id) {
+        searchBookRef.current.book.destroy()
+        searchBookRef.current = undefined
+      }
+      if (searchSourceRef.current?.bookId === bookRecord.id) {
+        searchSourceRef.current = undefined
+      }
+    }
+  }, [bookRecord.id])
+
+  useEffect(() => {
     if (!settingsOpen) return
 
     function closeSettingsOutside(event: PointerEvent) {
@@ -448,6 +523,25 @@ export function ReaderPage({
       document.removeEventListener('pointerdown', closeSettingsOutside)
     }
   }, [settingsOpen])
+
+  useEffect(() => {
+    function handleSearchShortcut(event: KeyboardEvent) {
+      if (
+        event.key.toLocaleLowerCase() !== 'f' ||
+        (!event.ctrlKey && !event.metaKey) ||
+        event.altKey
+      ) {
+        return
+      }
+      event.preventDefault()
+      setSettingsOpen(false)
+      setNavigationPanel('search')
+      setTocOpen(true)
+    }
+
+    document.addEventListener('keydown', handleSearchShortcut)
+    return () => document.removeEventListener('keydown', handleSearchShortcut)
+  }, [])
 
   useEffect(() => {
     const viewer = viewerRef.current
@@ -500,6 +594,7 @@ export function ReaderPage({
         const data = await getBookFile(bookRecord.id)
         if (!data) throw new Error('找不到原始 EPUB 文件。')
         if (isCancelled) return
+        searchSourceRef.current = { bookId: bookRecord.id, data }
         setOpeningMessage('正在排版正文…')
 
         const epubBook = ePub(data.slice(0))
@@ -535,6 +630,17 @@ export function ReaderPage({
 
         const settingsDocuments = new Set<Document>()
         function handlePaginationKeyDown(event: KeyboardEvent) {
+          if (
+            event.key.toLocaleLowerCase() === 'f' &&
+            (event.ctrlKey || event.metaKey) &&
+            !event.altKey
+          ) {
+            event.preventDefault()
+            setSettingsOpen(false)
+            setNavigationPanel('search')
+            setTocOpen(true)
+            return
+          }
           if (
             readerFlow !== 'paginated' ||
             !keyboardPaginationRef.current ||
@@ -930,11 +1036,98 @@ export function ReaderPage({
     return () => document.removeEventListener('keydown', handlePaginationKeyDown)
   }, [readerFlow])
 
+  async function searchBookContent(
+    query: string,
+    signal: AbortSignal,
+    onProgress: (progress: { completed: number; total: number }) => void,
+  ): Promise<BookSearchResult[]> {
+    const source = searchSourceRef.current
+    if (!source || source.bookId !== bookRecord.id) {
+      throw new Error('正文还在准备中，请稍后再试。')
+    }
+
+    let searchBookEntry = searchBookRef.current
+    if (!searchBookEntry || searchBookEntry.bookId !== bookRecord.id) {
+      searchBookEntry?.book.destroy()
+      searchBookEntry = {
+        bookId: bookRecord.id,
+        book: ePub(source.data.slice(0)),
+      }
+      searchBookRef.current = searchBookEntry
+    }
+
+    const searchBook = searchBookEntry.book
+    try {
+      await searchBook.ready
+    } catch {
+      if (searchBookRef.current?.book === searchBook) {
+        searchBookRef.current = undefined
+      }
+      searchBook.destroy()
+      throw new Error('无法读取这本书的正文。')
+    }
+    if (signal.aborted) throw new DOMException('搜索已取消', 'AbortError')
+
+    const sections: EpubSection[] = []
+    searchBook.spine.each((section: EpubSection) => {
+      if (section.linear) sections.push(section)
+    })
+    onProgress({ completed: 0, total: sections.length })
+
+    const results: BookSearchResult[] = []
+    const request = searchBook.load.bind(searchBook)
+    for (let index = 0; index < sections.length; index += 1) {
+      if (signal.aborted) throw new DOMException('搜索已取消', 'AbortError')
+      const section = sections[index]
+      try {
+        await section.load(request)
+        if (signal.aborted) {
+          throw new DOMException('搜索已取消', 'AbortError')
+        }
+        const matches = findSectionMatches(section, query)
+        const chapter =
+          findChapterLabel(tocRef.current, section.href) ||
+          `第 ${index + 1} 节`
+        matches.forEach((match) => {
+          results.push({
+            cfi: match.cfi,
+            chapter,
+            excerpt: match.excerpt || query,
+            href: section.href,
+          })
+        })
+      } finally {
+        section.unload()
+      }
+      onProgress({ completed: index + 1, total: sections.length })
+    }
+
+    return results
+  }
+
+  function handleNavigationToggle(panel: NavigationPanel) {
+    setSettingsOpen(false)
+    if (tocOpen && navigationPanel === panel) {
+      setTocOpen(false)
+      return
+    }
+    setNavigationPanel(panel)
+    setTocOpen(true)
+  }
+
   function displayChapter(href: string) {
     setChapterProgress(0)
     setAtChapterStart(false)
     setAtChapterEnd(false)
     void renditionRef.current?.display(href)
+    if (window.innerWidth < 980) setTocOpen(false)
+  }
+
+  function displaySearchResult(result: BookSearchResult) {
+    setChapterProgress(0)
+    setAtChapterStart(false)
+    setAtChapterEnd(false)
+    void renditionRef.current?.display(result.cfi)
     if (window.innerWidth < 980) setTocOpen(false)
   }
 
@@ -1054,20 +1247,38 @@ export function ReaderPage({
 
   return (
     <main className={`reader-page theme-${theme}`} style={readerLayoutStyle}>
-      <div className={tocOpen ? 'reader-layout toc-is-open' : 'reader-layout'}>
+      <div
+        className={
+          tocOpen
+            ? `reader-layout toc-is-open ${navigationPanel}-is-open`
+            : 'reader-layout'
+        }
+      >
         {tocOpen ? (
           <>
-            <TocPanel
-              items={toc}
-              currentHref={currentHref}
-              onBack={onBack}
-              onClose={() => setTocOpen(false)}
-              onSelect={displayChapter}
-            />
+            {navigationPanel === 'toc' ? (
+              <TocPanel
+                items={toc}
+                currentHref={currentHref}
+                onBack={onBack}
+                onClose={() => setTocOpen(false)}
+                onSearch={() => setNavigationPanel('search')}
+                onSelect={displayChapter}
+              />
+            ) : (
+              <BookSearchPanel
+                bookId={bookRecord.id}
+                onBack={onBack}
+                onClose={() => setTocOpen(false)}
+                onSearch={searchBookContent}
+                onSelect={displaySearchResult}
+                onShowToc={() => setNavigationPanel('toc')}
+              />
+            )}
             <button
               className="toc-backdrop"
               type="button"
-              aria-label="关闭目录"
+              aria-label="关闭书内导航"
               onClick={() => setTocOpen(false)}
             />
           </>
@@ -1087,7 +1298,7 @@ export function ReaderPage({
                     size={19}
                     strokeWidth={1.7}
                   />
-                  <span className="visually-hidden">打开目录</span>
+                  <span className="visually-hidden">打开书内导航</span>
                 </button>
               ) : null}
               <strong>{bookRecord.title}</strong>
@@ -1098,11 +1309,20 @@ export function ReaderPage({
               <button
                 className="reader-tool-button"
                 type="button"
-                aria-pressed={tocOpen}
-                onClick={() => setTocOpen((open) => !open)}
+                aria-pressed={tocOpen && navigationPanel === 'toc'}
+                onClick={() => handleNavigationToggle('toc')}
               >
                 <List aria-hidden="true" size={18} strokeWidth={1.7} />
                 <span>目录</span>
+              </button>
+              <button
+                className="reader-tool-button"
+                type="button"
+                aria-pressed={tocOpen && navigationPanel === 'search'}
+                onClick={() => handleNavigationToggle('search')}
+              >
+                <Search aria-hidden="true" size={18} strokeWidth={1.7} />
+                <span>搜索</span>
               </button>
               <div className="settings-anchor" ref={settingsAnchorRef}>
                 <button

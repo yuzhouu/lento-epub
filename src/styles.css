@@ -2181,6 +2181,10 @@ button:focus-visible,
   grid-template-columns: 272px minmax(0, 1fr);
 }
 
+.reader-layout.toc-is-open.search-is-open {
+  grid-template-columns: 340px minmax(0, 1fr);
+}
+
 .toc-panel {
   position: relative;
   z-index: 20;
@@ -2237,6 +2241,43 @@ button:focus-visible,
   letter-spacing: 0.01em;
 }
 
+.navigation-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  margin: 8px 20px 12px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--reader-hover);
+}
+
+.navigation-tabs button {
+  min-width: 0;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--reader-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.navigation-tabs button:hover {
+  color: var(--reader-text);
+}
+
+.navigation-tabs button.is-active {
+  color: var(--reader-text);
+  background: var(--reader-surface);
+  box-shadow: 0 1px 3px rgba(20, 22, 20, 0.08);
+  font-weight: 600;
+}
+
 .toc-panel nav {
   height: auto;
   overflow-y: auto;
@@ -2272,6 +2313,264 @@ button:focus-visible,
 .toc-empty {
   margin: 10px 28px;
   color: var(--reader-muted);
+}
+
+.book-search-content {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.book-search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 0 20px;
+}
+
+.book-search-field {
+  min-width: 0;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px 0 11px;
+  border: 1px solid var(--reader-border);
+  border-radius: 9px;
+  background: var(--reader-surface);
+  color: var(--reader-muted);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.book-search-field:focus-within {
+  border-color: rgba(49, 93, 75, 0.62);
+  box-shadow: 0 0 0 3px rgba(49, 93, 75, 0.1);
+}
+
+.theme-night .book-search-field:focus-within {
+  border-color: rgba(157, 195, 174, 0.72);
+  box-shadow: 0 0 0 3px rgba(157, 195, 174, 0.1);
+}
+
+.book-search-field > svg {
+  flex: none;
+}
+
+.book-search-field input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--reader-text);
+  font-size: 13px;
+}
+
+.book-search-field input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.book-search-field > button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--reader-muted);
+  cursor: pointer;
+}
+
+.book-search-field > button:hover {
+  background: var(--reader-hover);
+  color: var(--reader-text);
+}
+
+.book-search-submit {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 9px;
+  background: #315d4b;
+  color: #f7f7f5;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.book-search-submit:hover:not(:disabled) {
+  background: #244738;
+}
+
+.book-search-submit:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.book-search-status {
+  min-height: 38px;
+  padding: 10px 21px 7px;
+  overflow: hidden;
+  color: var(--reader-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.book-search-results {
+  min-height: 0;
+  padding: 0 12px 24px;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+.book-search-results li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 116px;
+}
+
+.book-search-results li + li {
+  border-top: 1px solid var(--reader-border);
+}
+
+.book-search-results button {
+  width: 100%;
+  display: grid;
+  gap: 7px;
+  padding: 13px 10px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.book-search-results button:hover {
+  background: var(--reader-hover);
+}
+
+.book-search-result-chapter {
+  overflow: hidden;
+  color: var(--reader-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.book-search-result-context {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--reader-muted);
+  font-family: var(--serif);
+  font-size: 13px;
+  line-height: 1.7;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.book-search-result-context mark {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: rgba(175, 144, 63, 0.25);
+  color: var(--reader-text);
+}
+
+.theme-night .book-search-result-context mark {
+  background: rgba(222, 190, 100, 0.24);
+}
+
+.book-search-empty {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 54px 28px;
+  color: var(--reader-muted);
+  text-align: center;
+}
+
+.book-search-empty p {
+  margin: 8px 0 0;
+  color: var(--reader-text);
+  font-family: var(--serif);
+  font-size: 15px;
+}
+
+.book-search-empty span {
+  font-size: 11.5px;
+}
+
+.recent-searches {
+  min-height: 0;
+  padding: 5px 20px 24px;
+  overflow-y: auto;
+}
+
+.recent-searches-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+.recent-searches-heading h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--reader-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.recent-searches-heading > button {
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--reader-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.recent-searches-heading > button:hover {
+  color: var(--reader-text);
+}
+
+.recent-searches ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.recent-searches li button {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 10px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--reader-text);
+  font-size: 13px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.recent-searches li button:hover {
+  background: var(--reader-hover);
 }
 
 .toc-footer {
@@ -2531,7 +2830,8 @@ button:focus-visible,
 }
 
 @media (max-width: 780px) {
-  .reader-layout.toc-is-open {
+  .reader-layout.toc-is-open,
+  .reader-layout.toc-is-open.search-is-open {
     grid-template-columns: 1fr;
   }
 
@@ -2540,6 +2840,10 @@ button:focus-visible,
     width: min(86vw, 320px);
     background: var(--reader-sidebar);
     box-shadow: 18px 0 48px rgba(20, 22, 20, 0.14);
+  }
+
+  .book-search-panel {
+    width: min(92vw, 360px);
   }
 
   .toc-backdrop {
