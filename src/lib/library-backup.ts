@@ -90,6 +90,7 @@ function parseBookRecord(value: unknown): BookRecord {
     title: readRequiredString(value, 'title'),
     author: readRequiredString(value, 'author'),
     fileName: readRequiredString(value, 'fileName'),
+    fileSize: readOptionalNumber(value, 'fileSize') ?? 0,
     fingerprint: readOptionalString(value, 'fingerprint'),
     addedAt: readRequiredNumber(value, 'addedAt'),
     lastOpenedAt: readOptionalNumber(value, 'lastOpenedAt'),

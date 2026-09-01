@@ -1,4 +1,5 @@
 import { BookOpen, Trash2 } from 'lucide-react'
+import { formatBytes } from '../../lib/format-bytes'
 import type { BookRecord } from '../../types/book'
 
 interface BookRowProps {
@@ -50,22 +51,29 @@ export function BookRow({ book, onOpen, onRequestDelete }: BookRowProps) {
             {formatDate(book.lastOpenedAt)}
           </time>
         </div>
-        <div className="book-progress" aria-label={`阅读进度 ${progress}%`}>
-          <div className="progress-track">
-            <span style={{ width: `${progress}%` }} />
+      </button>
+      <div className="book-row-aside">
+        <dl className="book-stats">
+          <div>
+            <dt>阅读进度</dt>
+            <dd>{progress}%</dd>
           </div>
-          <span>{progress}%</span>
-        </div>
-      </button>
-      <button
-        className="book-delete-button"
-        type="button"
-        aria-label={`删除《${book.title}》`}
-        title="删除书籍"
-        onClick={() => onRequestDelete(book)}
-      >
-        <Trash2 aria-hidden="true" size={18} strokeWidth={1.6} />
-      </button>
+          <div>
+            <dt>文件大小</dt>
+            <dd>{formatBytes(book.fileSize)}</dd>
+          </div>
+        </dl>
+        <button
+          className="book-delete-button"
+          type="button"
+          aria-label={`删除《${book.title}》`}
+          title="删除书籍"
+          onClick={() => onRequestDelete(book)}
+        >
+          <Trash2 aria-hidden="true" size={14} strokeWidth={1.6} />
+          <span>删除</span>
+        </button>
+      </div>
     </article>
   )
 }

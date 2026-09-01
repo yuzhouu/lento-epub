@@ -4,6 +4,7 @@ export interface BookRecord {
   author: string
   coverDataUrl?: string
   fileName: string
+  fileSize: number
   fingerprint?: string
   addedAt: number
   lastOpenedAt?: number

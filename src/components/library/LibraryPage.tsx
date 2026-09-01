@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { BookOpenText, Files, X } from 'lucide-react'
+import { BookOpenText, Files, TriangleAlert, X } from 'lucide-react'
 import { BookRow } from './BookRow'
 import { DeleteBookDialog } from './DeleteBookDialog'
 import { ImportBookButton, useBookImport } from './ImportBookButton'
 import { InstallAppButton } from './InstallAppButton'
 import { LibraryBackupActions } from './LibraryBackupActions'
+import {
+  getLibraryStorageInfo,
+  type LibraryStorageInfo,
+} from '../../lib/book-storage'
+import { formatBytes } from '../../lib/format-bytes'
 import type { BookRecord, DeletedBookEntry } from '../../types/book'
 
 interface LibraryPageProps {
@@ -25,6 +30,13 @@ function containsFiles(event: DragEvent<HTMLElement>): boolean {
   return Array.from(event.dataTransfer.types).includes('Files')
 }
 
+function formatUsagePercent(value: number): string {
+  if (value === 0) return '0%'
+  if (value < 0.1) return '<0.1%'
+  if (value < 10) return `${value.toFixed(1)}%`
+  return `${Math.round(value)}%`
+}
+
 export function LibraryPage({
   books,
   onImported,
@@ -39,7 +51,19 @@ export function LibraryPage({
   const [isDeleting, setIsDeleting] = useState(false)
   const [deletedEntry, setDeletedEntry] = useState<DeletedBookEntry>()
   const [libraryNotice, setLibraryNotice] = useState<LibraryNotice>()
+  const [storageInfo, setStorageInfo] = useState<LibraryStorageInfo>()
   const importer = useBookImport(onImported)
+
+  useEffect(() => {
+    let isCurrent = true
+    const bookBytes = books.reduce((total, book) => total + book.fileSize, 0)
+    void getLibraryStorageInfo(bookBytes).then((info) => {
+      if (isCurrent) setStorageInfo(info)
+    })
+    return () => {
+      isCurrent = false
+    }
+  }, [books])
 
   useEffect(() => {
     if (!deletedEntry) return
@@ -125,6 +149,11 @@ export function LibraryPage({
     }
   }
 
+  const usagePercent =
+    storageInfo?.usedBytes !== undefined && storageInfo.quotaBytes
+      ? Math.min(100, (storageInfo.usedBytes / storageInfo.quotaBytes) * 100)
+      : undefined
+
   return (
     <main
       className={`library-page${isDraggingFiles ? ' is-dragging' : ''}`}
@@ -157,9 +186,54 @@ export function LibraryPage({
 
       <section className="library-content" aria-labelledby="library-title">
         <div className="section-heading">
-          <h2 id="library-title">我的书架</h2>
-          <span>{books.length} 本书</span>
+          <div className="library-heading-copy">
+            <h2 id="library-title">我的书架</h2>
+            <span>{books.length} 本书</span>
+            <div
+              className={`library-storage-overview${
+                storageInfo?.isLow ? ' is-low' : ''
+              }`}
+              role="status"
+              title="包含 EPUB 文件、阅读数据与离线应用缓存"
+            >
+              {storageInfo ? (
+                storageInfo.quotaBytes !== undefined ? (
+                  <>
+                    <span>总占用</span>
+                    <span className="library-storage-value">
+                      {formatBytes(
+                        storageInfo.usedBytes ?? storageInfo.bookBytes,
+                      )}{' '}
+                      / {formatBytes(storageInfo.quotaBytes)}
+                    </span>
+                    <span className="library-storage-percent">
+                      {formatUsagePercent(usagePercent ?? 0)}
+                    </span>
+                  </>
+                ) : (
+                  <span>书籍占用 {formatBytes(storageInfo.bookBytes)}</span>
+                )
+              ) : (
+                <span>正在统计空间…</span>
+              )}
+            </div>
+          </div>
         </div>
+
+        {storageInfo?.isLow ? (
+          <div className="library-storage-warning" role="alert">
+            <TriangleAlert aria-hidden="true" size={19} strokeWidth={1.7} />
+            <div>
+              <strong>浏览器存储空间不足</strong>
+              <span>
+                {storageInfo.availableBytes !== undefined
+                  ? `仅剩约 ${formatBytes(storageInfo.availableBytes)}，继续添加或恢复书籍可能失败。`
+                  : '继续添加或恢复书籍可能失败。'}
+                请先删除不再需要的书，或释放设备空间。
+              </span>
+            </div>
+          </div>
+        ) : null}
 
         {books.length ? (
           <div className="book-list">

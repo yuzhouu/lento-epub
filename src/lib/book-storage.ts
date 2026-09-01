@@ -7,10 +7,32 @@ import type {
 import { createBookFingerprint } from './book-fingerprint'
 
 const DATABASE_NAME = 'lento-library'
-const DATABASE_VERSION = 2
+const DATABASE_VERSION = 3
 const BOOK_STORE = 'books'
 const FILE_STORE = 'files'
 const FINGERPRINT_INDEX = 'fingerprint'
+const LOW_STORAGE_BYTES = 100 * 1024 * 1024
+const LOW_STORAGE_RATIO = 0.05
+
+export interface LibraryStorageInfo {
+  bookBytes: number
+  usedBytes?: number
+  quotaBytes?: number
+  availableBytes?: number
+  isLow: boolean
+}
+
+export class InsufficientStorageError extends Error {
+  readonly requiredBytes: number
+  readonly availableBytes: number
+
+  constructor(requiredBytes: number, availableBytes: number) {
+    super('浏览器存储空间不足。')
+    this.name = 'InsufficientStorageError'
+    this.requiredBytes = requiredBytes
+    this.availableBytes = availableBytes
+  }
+}
 
 let databasePromise: Promise<IDBDatabase> | undefined
 
@@ -33,10 +55,11 @@ function openDatabase(): Promise<IDBDatabase> {
   databasePromise ??= new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION)
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const database = request.result
+      const upgradeTransaction = request.transaction!
       const bookStore = database.objectStoreNames.contains(BOOK_STORE)
-        ? request.transaction!.objectStore(BOOK_STORE)
+        ? upgradeTransaction.objectStore(BOOK_STORE)
         : database.createObjectStore(BOOK_STORE, { keyPath: 'id' })
 
       if (!bookStore.indexNames.contains('addedAt')) {
@@ -45,8 +68,30 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!bookStore.indexNames.contains(FINGERPRINT_INDEX)) {
         bookStore.createIndex(FINGERPRINT_INDEX, FINGERPRINT_INDEX)
       }
-      if (!database.objectStoreNames.contains(FILE_STORE)) {
-        database.createObjectStore(FILE_STORE, { keyPath: 'id' })
+      const fileStore = database.objectStoreNames.contains(FILE_STORE)
+        ? upgradeTransaction.objectStore(FILE_STORE)
+        : database.createObjectStore(FILE_STORE, { keyPath: 'id' })
+
+      if (event.oldVersion < 3) {
+        const cursorRequest = fileStore.openCursor()
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result
+          if (cursor) {
+            const file = cursor.value as BookFileRecord
+            const bookRequest = bookStore.get(file.id) as IDBRequest<
+              BookRecord | undefined
+            >
+            bookRequest.onsuccess = () => {
+              if (!bookRequest.result) return
+              bookStore.put({
+                ...bookRequest.result,
+                fileSize: file.data.byteLength,
+              } satisfies BookRecord)
+            }
+            cursor.continue()
+            return
+          }
+        }
       }
     }
 
@@ -57,6 +102,131 @@ function openDatabase(): Promise<IDBDatabase> {
   return databasePromise
 }
 
+async function getBrowserStorageEstimate(): Promise<StorageEstimate> {
+  try {
+    return (await navigator.storage?.estimate()) ?? {}
+  } catch {
+    return {}
+  }
+}
+
+export async function getLibraryStorageInfo(
+  bookBytes: number,
+): Promise<LibraryStorageInfo> {
+  const estimate = await getBrowserStorageEstimate()
+  const usedBytes = estimate.usage
+  const quotaBytes = estimate.quota
+  const availableBytes =
+    usedBytes === undefined || quotaBytes === undefined
+      ? undefined
+      : Math.max(0, quotaBytes - usedBytes)
+  const isLow =
+    availableBytes !== undefined &&
+    quotaBytes !== undefined &&
+    (availableBytes < LOW_STORAGE_BYTES ||
+      availableBytes / quotaBytes < LOW_STORAGE_RATIO)
+
+  return {
+    bookBytes,
+    usedBytes,
+    quotaBytes,
+    availableBytes,
+    isLow,
+  }
+}
+
+export async function ensureStorageCapacity(requiredBytes: number): Promise<void> {
+  if (requiredBytes <= 0) return
+  const estimate = await getBrowserStorageEstimate()
+  if (estimate.usage === undefined || estimate.quota === undefined) return
+
+  const availableBytes = Math.max(0, estimate.quota - estimate.usage)
+  const writeHeadroom = Math.min(
+    Math.max(requiredBytes * 0.1, 1024 * 1024),
+    32 * 1024 * 1024,
+  )
+  if (availableBytes < requiredBytes + writeHeadroom) {
+    throw new InsufficientStorageError(requiredBytes, availableBytes)
+  }
+}
+
+function isQuotaExceededError(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.name === 'QuotaExceededError' || error.code === 22)
+  )
+}
+
+export function getStorageErrorMessage(error: unknown): string | undefined {
+  if (error instanceof InsufficientStorageError) {
+    return '浏览器存储空间不足，无法添加这些书。请先删除不再需要的书，或释放设备空间后重试。'
+  }
+  if (isQuotaExceededError(error)) {
+    return '浏览器存储空间已不足，写入未完成。请先删除不再需要的书，或释放设备空间后重试。'
+  }
+  return undefined
+}
+
+async function getAdditionalFileBytes(
+  entries: LibraryBackupEntry[],
+): Promise<number> {
+  const database = await openDatabase()
+  const transaction = database.transaction(FILE_STORE, 'readonly')
+  const fileStore = transaction.objectStore(FILE_STORE)
+  const existingFiles = await Promise.all(
+    entries.map(({ book }) =>
+      requestToPromise(
+        fileStore.get(book.id) as IDBRequest<BookFileRecord | undefined>,
+      ),
+    ),
+  )
+
+  return entries.reduce((total, entry, index) => {
+    const existingBytes = existingFiles[index]?.data.byteLength ?? 0
+    return total + Math.max(0, entry.data.byteLength - existingBytes)
+  }, 0)
+}
+
+async function backfillBookFileSizes(
+  books: BookRecord[],
+): Promise<BookRecord[]> {
+  const booksMissingSize = books.filter(
+    (book) => !Number.isFinite(book.fileSize) || book.fileSize < 0,
+  )
+  if (booksMissingSize.length === 0) return books
+
+  const database = await openDatabase()
+  const transaction = database.transaction(
+    [BOOK_STORE, FILE_STORE],
+    'readwrite',
+  )
+  const transactionComplete = transactionToPromise(transaction)
+  const bookStore = transaction.objectStore(BOOK_STORE)
+  const fileStore = transaction.objectStore(FILE_STORE)
+  const files = await Promise.all(
+    booksMissingSize.map((book) =>
+      requestToPromise(
+        fileStore.get(book.id) as IDBRequest<BookFileRecord | undefined>,
+      ),
+    ),
+  )
+  const sizesById = new Map(
+    booksMissingSize.map((book, index) => [
+      book.id,
+      files[index]?.data.byteLength ?? 0,
+    ]),
+  )
+  const updatedBooks = books.map((book) => {
+    const fileSize = sizesById.get(book.id)
+    if (fileSize === undefined) return book
+    const updatedBook = { ...book, fileSize }
+    bookStore.put(updatedBook)
+    return updatedBook
+  })
+  await transactionComplete
+  return updatedBooks
+}
+
 export async function getBooks(): Promise<BookRecord[]> {
   const database = await openDatabase()
   const transaction = database.transaction(BOOK_STORE, 'readonly')
@@ -64,7 +234,8 @@ export async function getBooks(): Promise<BookRecord[]> {
     transaction.objectStore(BOOK_STORE).getAll() as IDBRequest<BookRecord[]>,
   )
 
-  return [...books].sort(
+  const booksWithFileSizes = await backfillBookFileSizes(books)
+  return [...booksWithFileSizes].sort(
     (left, right) =>
       (right.lastOpenedAt ?? right.addedAt) -
       (left.lastOpenedAt ?? left.addedAt),
@@ -148,6 +319,10 @@ export async function saveImportedBooks(
 
   if (importedEntries.length === 0) return { imported: [], duplicates }
 
+  await ensureStorageCapacity(
+    importedEntries.reduce((total, entry) => total + entry.data.byteLength, 0),
+  )
+
   const database = await openDatabase()
   const transaction = database.transaction(
     [BOOK_STORE, FILE_STORE],
@@ -156,12 +331,15 @@ export async function saveImportedBooks(
   const bookStore = transaction.objectStore(BOOK_STORE)
   const fileStore = transaction.objectStore(FILE_STORE)
   for (const { book, data } of importedEntries) {
-    bookStore.put(book)
+    bookStore.put({ ...book, fileSize: data.byteLength } satisfies BookRecord)
     fileStore.put({ id: book.id, data } satisfies BookFileRecord)
   }
   await transactionToPromise(transaction)
   return {
-    imported: importedEntries.map(({ book }) => book),
+    imported: importedEntries.map(({ book, data }) => ({
+      ...book,
+      fileSize: data.byteLength,
+    })),
     duplicates,
   }
 }
@@ -214,11 +392,13 @@ export async function restoreDeletedBook(
     [BOOK_STORE, FILE_STORE],
     'readwrite',
   )
+  const fileStore = transaction.objectStore(FILE_STORE)
   transaction.objectStore(BOOK_STORE).put({
     ...entry.book,
     fingerprint,
+    fileSize: entry.data.byteLength,
   } satisfies BookRecord)
-  transaction.objectStore(FILE_STORE).put({
+  fileStore.put({
     id: entry.book.id,
     data: entry.data,
   } satisfies BookFileRecord)
@@ -250,13 +430,15 @@ export async function getLibraryBackupEntries(): Promise<
   return books.map((book) => {
     const data = filesById.get(book.id)
     if (!data) throw new Error(`《${book.title}》的书籍文件已经丢失。`)
-    return { book, data }
+    return { book: { ...book, fileSize: data.byteLength }, data }
   })
 }
 
 export async function restoreLibraryBackupEntries(
   entries: LibraryBackupEntry[],
 ): Promise<BookRecord[]> {
+  await ensureStorageCapacity(await getAdditionalFileBytes(entries))
+
   const database = await openDatabase()
   const transaction = database.transaction(
     [BOOK_STORE, FILE_STORE],
@@ -267,7 +449,7 @@ export async function restoreLibraryBackupEntries(
   const fileStore = transaction.objectStore(FILE_STORE)
 
   for (const { book, data } of entries) {
-    bookStore.put(book)
+    bookStore.put({ ...book, fileSize: data.byteLength } satisfies BookRecord)
     fileStore.put({ id: book.id, data } satisfies BookFileRecord)
   }
 

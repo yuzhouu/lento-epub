@@ -74,6 +74,7 @@ async function prepareEpub(
       author,
       coverDataUrl,
       fileName: file.name,
+      fileSize: data.byteLength,
       fingerprint,
       addedAt,
       progress: 0,

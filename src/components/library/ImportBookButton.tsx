@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { getStorageErrorMessage } from '../../lib/book-storage'
 import type { BookRecord } from '../../types/book'
 import type { EpubImportResult } from '../../lib/import-epub'
 
@@ -66,9 +67,10 @@ export function useBookImport(
         setNotice({
           kind: 'error',
           message:
-            importError instanceof Error
+            getStorageErrorMessage(importError) ??
+            (importError instanceof Error
               ? importError.message
-              : '添加书本失败。',
+              : '添加书本失败。'),
         })
       } finally {
         importingRef.current = false

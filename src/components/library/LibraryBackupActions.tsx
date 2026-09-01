@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { ArchiveRestore, Download } from 'lucide-react'
+import { getStorageErrorMessage } from '../../lib/book-storage'
 import type { BookRecord } from '../../types/book'
 
 interface LibraryBackupActionsProps {
@@ -26,7 +27,10 @@ export function LibraryBackupActions({
 
   function finishWithError(backupError: unknown) {
     setError(
-      backupError instanceof Error ? backupError.message : '书库操作失败。',
+      getStorageErrorMessage(backupError) ??
+        (backupError instanceof Error
+          ? backupError.message
+          : '书库操作失败。'),
     )
   }
 
