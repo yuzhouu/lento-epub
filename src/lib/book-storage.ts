@@ -1,13 +1,16 @@
 import type {
   BookFileRecord,
   BookRecord,
+  DeletedBookEntry,
   LibraryBackupEntry,
 } from '../types/book'
+import { createBookFingerprint } from './book-fingerprint'
 
 const DATABASE_NAME = 'lento-library'
-const DATABASE_VERSION = 1
+const DATABASE_VERSION = 2
 const BOOK_STORE = 'books'
 const FILE_STORE = 'files'
+const FINGERPRINT_INDEX = 'fingerprint'
 
 let databasePromise: Promise<IDBDatabase> | undefined
 
@@ -32,11 +35,15 @@ function openDatabase(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = () => {
       const database = request.result
-      if (!database.objectStoreNames.contains(BOOK_STORE)) {
-        const bookStore = database.createObjectStore(BOOK_STORE, {
-          keyPath: 'id',
-        })
+      const bookStore = database.objectStoreNames.contains(BOOK_STORE)
+        ? request.transaction!.objectStore(BOOK_STORE)
+        : database.createObjectStore(BOOK_STORE, { keyPath: 'id' })
+
+      if (!bookStore.indexNames.contains('addedAt')) {
         bookStore.createIndex('addedAt', 'addedAt')
+      }
+      if (!bookStore.indexNames.contains(FINGERPRINT_INDEX)) {
+        bookStore.createIndex(FINGERPRINT_INDEX, FINGERPRINT_INDEX)
       }
       if (!database.objectStoreNames.contains(FILE_STORE)) {
         database.createObjectStore(FILE_STORE, { keyPath: 'id' })
@@ -75,17 +82,146 @@ export async function getBookFile(id: string): Promise<ArrayBuffer | undefined> 
   return result?.data
 }
 
-export async function saveImportedBook(
-  book: BookRecord,
-  data: ArrayBuffer,
-): Promise<void> {
+export interface ImportedBookEntry {
+  book: BookRecord & { fingerprint: string }
+  data: ArrayBuffer
+}
+
+export interface DuplicateBookEntry {
+  book: BookRecord
+  existingBook: BookRecord
+}
+
+export interface SaveImportedBooksResult {
+  imported: BookRecord[]
+  duplicates: DuplicateBookEntry[]
+}
+
+async function getStoredFingerprintMap(): Promise<Map<string, BookRecord>> {
+  const entries = await getLibraryBackupEntries()
+  const backfilled = await Promise.all(
+    entries.map(async ({ book, data }) => {
+      if (book.fingerprint) return book
+      return { ...book, fingerprint: await createBookFingerprint(data) }
+    }),
+  )
+  const booksToUpdate = backfilled.filter(
+    (book, index) => book !== entries[index].book,
+  )
+
+  if (booksToUpdate.length > 0) {
+    const database = await openDatabase()
+    const transaction = database.transaction(BOOK_STORE, 'readwrite')
+    const bookStore = transaction.objectStore(BOOK_STORE)
+    for (const book of booksToUpdate) bookStore.put(book)
+    await transactionToPromise(transaction)
+  }
+
+  const booksByFingerprint = new Map<string, BookRecord>()
+  for (const book of backfilled) {
+    if (book.fingerprint && !booksByFingerprint.has(book.fingerprint)) {
+      booksByFingerprint.set(book.fingerprint, book)
+    }
+  }
+  return booksByFingerprint
+}
+
+export async function saveImportedBooks(
+  entries: ImportedBookEntry[],
+): Promise<SaveImportedBooksResult> {
+  if (entries.length === 0) return { imported: [], duplicates: [] }
+
+  const booksByFingerprint = await getStoredFingerprintMap()
+  const importedEntries: ImportedBookEntry[] = []
+  const duplicates: DuplicateBookEntry[] = []
+
+  for (const entry of entries) {
+    const existingBook = booksByFingerprint.get(entry.book.fingerprint)
+    if (existingBook) {
+      duplicates.push({ book: entry.book, existingBook })
+      continue
+    }
+
+    booksByFingerprint.set(entry.book.fingerprint, entry.book)
+    importedEntries.push(entry)
+  }
+
+  if (importedEntries.length === 0) return { imported: [], duplicates }
+
   const database = await openDatabase()
   const transaction = database.transaction(
     [BOOK_STORE, FILE_STORE],
     'readwrite',
   )
-  transaction.objectStore(BOOK_STORE).put(book)
-  transaction.objectStore(FILE_STORE).put({ id: book.id, data })
+  const bookStore = transaction.objectStore(BOOK_STORE)
+  const fileStore = transaction.objectStore(FILE_STORE)
+  for (const { book, data } of importedEntries) {
+    bookStore.put(book)
+    fileStore.put({ id: book.id, data } satisfies BookFileRecord)
+  }
+  await transactionToPromise(transaction)
+  return {
+    imported: importedEntries.map(({ book }) => book),
+    duplicates,
+  }
+}
+
+export async function deleteBook(
+  id: string,
+): Promise<DeletedBookEntry | undefined> {
+  const database = await openDatabase()
+  const transaction = database.transaction(
+    [BOOK_STORE, FILE_STORE],
+    'readwrite',
+  )
+  const transactionComplete = transactionToPromise(transaction)
+  const bookStore = transaction.objectStore(BOOK_STORE)
+  const fileStore = transaction.objectStore(FILE_STORE)
+  const [book, file] = await Promise.all([
+    requestToPromise(
+      bookStore.get(id) as IDBRequest<BookRecord | undefined>,
+    ),
+    requestToPromise(
+      fileStore.get(id) as IDBRequest<BookFileRecord | undefined>,
+    ),
+  ])
+
+  if (!book) {
+    await transactionComplete
+    return undefined
+  }
+
+  bookStore.delete(id)
+  fileStore.delete(id)
+  await transactionComplete
+  return { book, data: file?.data }
+}
+
+export async function restoreDeletedBook(
+  entry: DeletedBookEntry,
+): Promise<void> {
+  if (!entry.data) throw new Error('这本书的 EPUB 文件已经无法恢复。')
+
+  const fingerprint =
+    entry.book.fingerprint ?? (await createBookFingerprint(entry.data))
+  const existingBook = (await getStoredFingerprintMap()).get(fingerprint)
+  if (existingBook && existingBook.id !== entry.book.id) {
+    throw new Error(`书架中已有《${existingBook.title}》，无法撤销删除。`)
+  }
+
+  const database = await openDatabase()
+  const transaction = database.transaction(
+    [BOOK_STORE, FILE_STORE],
+    'readwrite',
+  )
+  transaction.objectStore(BOOK_STORE).put({
+    ...entry.book,
+    fingerprint,
+  } satisfies BookRecord)
+  transaction.objectStore(FILE_STORE).put({
+    id: entry.book.id,
+    data: entry.data,
+  } satisfies BookFileRecord)
   await transactionToPromise(transaction)
 }
 

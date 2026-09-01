@@ -143,7 +143,8 @@ button:focus-visible,
 }
 
 .primary-button,
-.secondary-button {
+.secondary-button,
+.danger-button {
   display: inline-flex;
   min-height: 48px;
   align-items: center;
@@ -183,7 +184,8 @@ button:focus-visible,
 }
 
 .primary-button:disabled,
-.secondary-button:disabled {
+.secondary-button:disabled,
+.danger-button:disabled {
   cursor: wait;
   opacity: 0.62;
   transform: none;
@@ -271,17 +273,54 @@ button:focus-visible,
 .book-row {
   min-height: 206px;
   display: grid;
-  grid-template-columns: 116px minmax(260px, 1fr) minmax(220px, 390px);
+  grid-template-columns: minmax(0, 1fr) 44px;
   align-items: center;
-  gap: clamp(28px, 3vw, 50px);
-  padding: 18px 4px;
+  gap: 14px;
+  padding: 0 4px;
   border-bottom: 1px solid var(--line);
-  cursor: pointer;
   transition: background-color 170ms ease;
 }
 
 .book-row:hover {
   background: rgba(255, 255, 255, 0.38);
+}
+
+.book-open-button {
+  min-width: 0;
+  min-height: 205px;
+  display: grid;
+  grid-template-columns: 116px minmax(260px, 1fr) minmax(220px, 390px);
+  align-items: center;
+  gap: clamp(28px, 3vw, 50px);
+  padding: 18px 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.book-delete-button {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--faint);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.book-delete-button:hover {
+  border-color: rgba(132, 53, 43, 0.2);
+  color: #834b43;
+  background: rgba(132, 53, 43, 0.06);
 }
 
 .book-cover {
@@ -332,6 +371,10 @@ button:focus-visible,
   font-size: clamp(24px, 2vw, 31px);
   font-weight: 500;
   letter-spacing: 0.035em;
+}
+
+.book-copy {
+  min-width: 0;
 }
 
 .book-copy p,
@@ -408,6 +451,157 @@ button:focus-visible,
 .empty-library p {
   margin: 0 0 28px;
   font-size: 14px;
+}
+
+.drop-import-overlay {
+  position: fixed;
+  z-index: 40;
+  inset: 16px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  border: 2px dashed rgba(49, 93, 75, 0.48);
+  border-radius: 10px;
+  color: var(--green-deep);
+  background: rgba(245, 242, 235, 0.94);
+  box-shadow: 0 18px 70px rgba(30, 41, 37, 0.12);
+  pointer-events: none;
+}
+
+.drop-import-overlay strong {
+  margin-top: 5px;
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.drop-import-overlay span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.delete-book-dialog {
+  width: min(440px, calc(100vw - 40px));
+  padding: 30px;
+  border: 1px solid rgba(35, 49, 43, 0.14);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #f8f5ee;
+  box-shadow: 0 24px 80px rgba(24, 34, 29, 0.2);
+}
+
+.delete-book-dialog::backdrop {
+  background: rgba(25, 34, 30, 0.28);
+  backdrop-filter: blur(2px);
+}
+
+.delete-book-dialog h2 {
+  margin: 0 0 12px;
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.delete-book-dialog p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.delete-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 27px;
+}
+
+.delete-dialog-actions button {
+  min-height: 42px;
+  padding-inline: 18px;
+}
+
+.danger-button {
+  color: #fffaf7;
+  background: #82473f;
+}
+
+.danger-button:hover {
+  background: #6f3a33;
+}
+
+.library-toast-region {
+  position: fixed;
+  z-index: 60;
+  right: clamp(20px, 4vw, 56px);
+  bottom: 30px;
+  width: min(430px, calc(100vw - 40px));
+  display: grid;
+  gap: 10px;
+}
+
+.library-toast {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 15px;
+  border: 1px solid rgba(49, 93, 75, 0.22);
+  border-radius: 6px;
+  color: var(--green-deep);
+  background: #edf2ed;
+  box-shadow: 0 14px 42px rgba(30, 41, 37, 0.12);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.library-toast.is-error {
+  border-color: rgba(132, 53, 43, 0.25);
+  color: #733c34;
+  background: #f8eee9;
+}
+
+.library-toast > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.library-toast strong {
+  font-weight: 550;
+}
+
+.library-toast span {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+}
+
+.library-toast > button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  color: currentColor;
+  background: transparent;
+  cursor: pointer;
+}
+
+.delete-undo-toast {
+  align-items: center;
+  color: #f8f6f0;
+  background: var(--green-deep);
+}
+
+.delete-undo-toast > button {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.58);
+  font-weight: 600;
 }
 
 .reader-page {
@@ -1451,9 +1645,21 @@ button:focus-visible,
 
   .book-row {
     min-height: 164px;
+    grid-template-columns: minmax(0, 1fr) 38px;
+    gap: 6px;
+    padding: 0;
+  }
+
+  .book-open-button {
+    min-height: 163px;
     grid-template-columns: 86px minmax(0, 1fr);
     gap: 20px;
     padding: 16px 0;
+  }
+
+  .book-delete-button {
+    width: 36px;
+    height: 36px;
   }
 
   .book-cover {
@@ -1466,6 +1672,15 @@ button:focus-visible,
     grid-template-columns: 1fr 38px;
     gap: 12px;
     margin-top: -26px;
+  }
+
+  .library-toast-region {
+    right: 20px;
+    bottom: 20px;
+  }
+
+  .delete-book-dialog {
+    padding: 25px 22px 22px;
   }
 
   .book-copy h2 {

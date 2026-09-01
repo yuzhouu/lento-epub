@@ -1,5 +1,6 @@
 import ePub from 'epubjs'
-import { saveImportedBook } from './book-storage'
+import { saveImportedBooks, type ImportedBookEntry } from './book-storage'
+import { createBookFingerprint } from './book-fingerprint'
 import type { BookRecord } from '../types/book'
 
 const EPUB_FILE_PATTERN = /\.epub$/i
@@ -31,31 +32,54 @@ async function extractCoverDataUrl(
   }
 }
 
-export async function importEpub(file: File): Promise<BookRecord> {
+export interface EpubImportFailure {
+  fileName: string
+  message: string
+}
+
+export interface EpubImportDuplicate {
+  fileName: string
+  existingTitle: string
+}
+
+export interface EpubImportResult {
+  imported: BookRecord[]
+  duplicates: EpubImportDuplicate[]
+  failures: EpubImportFailure[]
+}
+
+async function prepareEpub(
+  file: File,
+  addedAt: number,
+): Promise<ImportedBookEntry> {
   if (!EPUB_FILE_PATTERN.test(file.name)) {
-    throw new Error('请选择 .epub 格式的书本。')
+    throw new Error('不是 EPUB 文件。')
   }
 
   const data = await file.arrayBuffer()
   const epubBook = ePub(data.slice(0))
 
   try {
-    const metadata = await epubBook.loaded.metadata
-    const coverDataUrl = await extractCoverDataUrl(await epubBook.coverUrl())
+    const [, metadata, coverDataUrl, fingerprint] = await Promise.all([
+      epubBook.ready,
+      epubBook.loaded.metadata,
+      epubBook.coverUrl().then(extractCoverDataUrl),
+      createBookFingerprint(data),
+    ])
     const title = metadata.title?.trim() || stripExtension(file.name)
     const author = metadata.creator?.trim() || '未知作者'
-    const book: BookRecord = {
+    const book: BookRecord & { fingerprint: string } = {
       id: crypto.randomUUID(),
       title,
       author,
       coverDataUrl,
       fileName: file.name,
-      addedAt: Date.now(),
+      fingerprint,
+      addedAt,
       progress: 0,
     }
 
-    await saveImportedBook(book, data)
-    return book
+    return { book, data }
   } catch (error) {
     throw new Error(
       error instanceof Error && error.message
@@ -64,5 +88,46 @@ export async function importEpub(file: File): Promise<BookRecord> {
     )
   } finally {
     epubBook.destroy()
+  }
+}
+
+export async function importEpubFiles(
+  files: File[],
+): Promise<EpubImportResult> {
+  const importedAt = Date.now()
+  const preparedResults = await Promise.all(
+    files.map(async (file, index) => {
+      try {
+        return {
+          entry: await prepareEpub(file, importedAt - index),
+          failure: undefined,
+        }
+      } catch (error) {
+        return {
+          entry: undefined,
+          failure: {
+            fileName: file.name,
+            message:
+              error instanceof Error ? error.message : '无法读取这本 EPUB。',
+          },
+        }
+      }
+    }),
+  )
+  const entries = preparedResults.flatMap(({ entry }) =>
+    entry ? [entry] : [],
+  )
+  const failures = preparedResults.flatMap(({ failure }) =>
+    failure ? [failure] : [],
+  )
+  const saved = await saveImportedBooks(entries)
+
+  return {
+    imported: saved.imported,
+    duplicates: saved.duplicates.map(({ book, existingBook }) => ({
+      fileName: book.fileName,
+      existingTitle: existingBook.title,
+    })),
+    failures,
   }
 }

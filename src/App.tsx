@@ -1,7 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { LibraryPage } from './components/library/LibraryPage'
-import { getBooks } from './lib/book-storage'
-import type { BookRecord } from './types/book'
+import {
+  deleteBook,
+  getBooks,
+  restoreDeletedBook,
+} from './lib/book-storage'
+import type { BookRecord, DeletedBookEntry } from './types/book'
 
 const ReaderPage = lazy(() =>
   import('./components/reader/ReaderPage').then((module) => ({
@@ -36,8 +40,8 @@ export function App() {
     [activeBookId, books],
   )
 
-  function handleImported(book: BookRecord) {
-    setBooks((current) => [book, ...current])
+  function handleImported(importedBooks: BookRecord[]) {
+    setBooks((current) => [...importedBooks, ...current])
   }
 
   function handleRestored(restoredBooks: BookRecord[]) {
@@ -48,6 +52,21 @@ export function App() {
     setBooks((current) =>
       current.map((book) => (book.id === updatedBook.id ? updatedBook : book)),
     )
+  }
+
+  async function handleDelete(
+    id: string,
+  ): Promise<DeletedBookEntry | undefined> {
+    const deleted = await deleteBook(id)
+    if (deleted) {
+      setBooks((current) => current.filter((book) => book.id !== id))
+    }
+    return deleted
+  }
+
+  async function handleUndoDelete(entry: DeletedBookEntry): Promise<void> {
+    await restoreDeletedBook(entry)
+    setBooks(await getBooks())
   }
 
   function handleOpen(id: string) {
@@ -89,6 +108,8 @@ export function App() {
       books={books}
       onImported={handleImported}
       onRestored={handleRestored}
+      onDelete={handleDelete}
+      onUndoDelete={handleUndoDelete}
       onOpen={handleOpen}
     />
   )

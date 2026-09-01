@@ -4,6 +4,7 @@ export interface BookRecord {
   author: string
   coverDataUrl?: string
   fileName: string
+  fingerprint?: string
   addedAt: number
   lastOpenedAt?: number
   progress: number
@@ -19,6 +20,11 @@ export interface BookFileRecord {
 export interface LibraryBackupEntry {
   book: BookRecord
   data: ArrayBuffer
+}
+
+export interface DeletedBookEntry {
+  book: BookRecord
+  data?: ArrayBuffer
 }
 
 export interface TocItem {
