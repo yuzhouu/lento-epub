@@ -1,4 +1,8 @@
-import type { BookFileRecord, BookRecord } from '../types/book'
+import type {
+  BookFileRecord,
+  BookRecord,
+  LibraryBackupEntry,
+} from '../types/book'
 
 const DATABASE_NAME = 'lento-library'
 const DATABASE_VERSION = 1
@@ -83,6 +87,56 @@ export async function saveImportedBook(
   transaction.objectStore(BOOK_STORE).put(book)
   transaction.objectStore(FILE_STORE).put({ id: book.id, data })
   await transactionToPromise(transaction)
+}
+
+export async function getLibraryBackupEntries(): Promise<
+  LibraryBackupEntry[]
+> {
+  const database = await openDatabase()
+  const transaction = database.transaction(
+    [BOOK_STORE, FILE_STORE],
+    'readonly',
+  )
+  const transactionComplete = transactionToPromise(transaction)
+  const booksRequest = transaction.objectStore(BOOK_STORE).getAll() as IDBRequest<
+    BookRecord[]
+  >
+  const filesRequest = transaction.objectStore(FILE_STORE).getAll() as IDBRequest<
+    BookFileRecord[]
+  >
+  const [books, files] = await Promise.all([
+    requestToPromise(booksRequest),
+    requestToPromise(filesRequest),
+  ])
+  await transactionComplete
+
+  const filesById = new Map(files.map((file) => [file.id, file.data]))
+  return books.map((book) => {
+    const data = filesById.get(book.id)
+    if (!data) throw new Error(`《${book.title}》的书籍文件已经丢失。`)
+    return { book, data }
+  })
+}
+
+export async function restoreLibraryBackupEntries(
+  entries: LibraryBackupEntry[],
+): Promise<BookRecord[]> {
+  const database = await openDatabase()
+  const transaction = database.transaction(
+    [BOOK_STORE, FILE_STORE],
+    'readwrite',
+  )
+  const transactionComplete = transactionToPromise(transaction)
+  const bookStore = transaction.objectStore(BOOK_STORE)
+  const fileStore = transaction.objectStore(FILE_STORE)
+
+  for (const { book, data } of entries) {
+    bookStore.put(book)
+    fileStore.put({ id: book.id, data } satisfies BookFileRecord)
+  }
+
+  await transactionComplete
+  return getBooks()
 }
 
 export async function updateBookReadingState(

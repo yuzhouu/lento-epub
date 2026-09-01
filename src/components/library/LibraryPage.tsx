@@ -1,15 +1,23 @@
 import { BookOpenText } from 'lucide-react'
 import { BookRow } from './BookRow'
 import { ImportBookButton } from './ImportBookButton'
+import { InstallAppButton } from './InstallAppButton'
+import { LibraryBackupActions } from './LibraryBackupActions'
 import type { BookRecord } from '../../types/book'
 
 interface LibraryPageProps {
   books: BookRecord[]
   onImported: (book: BookRecord) => void
+  onRestored: (books: BookRecord[]) => void
   onOpen: (id: string) => void
 }
 
-export function LibraryPage({ books, onImported, onOpen }: LibraryPageProps) {
+export function LibraryPage({
+  books,
+  onImported,
+  onRestored,
+  onOpen,
+}: LibraryPageProps) {
   return (
     <main className="library-page">
       <header className="library-header">
@@ -21,7 +29,14 @@ export function LibraryPage({ books, onImported, onOpen }: LibraryPageProps) {
             <span>Read without hurry.</span>
           </div>
         </div>
-        <ImportBookButton onImported={onImported} />
+        <div className="library-actions">
+          <InstallAppButton />
+          <LibraryBackupActions
+            hasBooks={books.length > 0}
+            onRestored={onRestored}
+          />
+          <ImportBookButton onImported={onImported} />
+        </div>
       </header>
 
       <section className="library-content" aria-labelledby="library-title">

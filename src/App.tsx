@@ -40,6 +40,10 @@ export function App() {
     setBooks((current) => [book, ...current])
   }
 
+  function handleRestored(restoredBooks: BookRecord[]) {
+    setBooks(restoredBooks)
+  }
+
   function handleBookUpdate(updatedBook: BookRecord) {
     setBooks((current) =>
       current.map((book) => (book.id === updatedBook.id ? updatedBook : book)),
@@ -84,6 +88,7 @@ export function App() {
     <LibraryPage
       books={books}
       onImported={handleImported}
+      onRestored={handleRestored}
       onOpen={handleOpen}
     />
   )

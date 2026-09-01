@@ -16,6 +16,11 @@ export interface BookFileRecord {
   data: ArrayBuffer
 }
 
+export interface LibraryBackupEntry {
+  book: BookRecord
+  data: ArrayBuffer
+}
+
 export interface TocItem {
   id: string
   href: string

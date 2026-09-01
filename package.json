@@ -4,13 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 4178",
+    "dev": "vite --mode web --host 127.0.0.1 --port 4178",
     "typecheck": "tsc --noEmit",
-    "build": "npm run typecheck && vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 4178"
+    "build": "npm run typecheck && npm run build:web && npm run build:extension",
+    "build:web": "vite build --mode web",
+    "build:extension": "vite build --mode extension",
+    "preview": "vite preview --mode web --host 127.0.0.1 --port 4178"
   },
   "dependencies": {
     "epubjs": "^0.3.93",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

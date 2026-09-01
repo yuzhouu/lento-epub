@@ -1,0 +1,32 @@
+{
+  "name": "卷舍 · Lento EPUB 阅读器",
+  "short_name": "卷舍 · Lento",
+  "description": "一个安静、简洁、数据留在本地的 EPUB 阅读器。",
+  "lang": "zh-CN",
+  "id": ".",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f5f2eb",
+  "theme_color": "#f5f2eb",
+  "icons": [
+    {
+      "src": "icons/lento.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/lento.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/lento-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
