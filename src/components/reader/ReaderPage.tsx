@@ -222,6 +222,7 @@ export function ReaderPage({
   onBookUpdate,
 }: ReaderPageProps) {
   const viewerRef = useRef<HTMLDivElement>(null)
+  const settingsAnchorRef = useRef<HTMLDivElement>(null)
   const renditionRef = useRef<EpubRendition | null>(null)
   const tocRef = useRef<TocItem[]>([])
   const currentLocationRef = useRef(bookRecord.location)
@@ -242,6 +243,26 @@ export function ReaderPage({
   const [error, setError] = useState<string>()
 
   useEffect(() => {
+    if (!settingsOpen) return
+
+    function closeSettingsOutside(event: PointerEvent) {
+      const target = event.target
+      if (
+        target instanceof Node &&
+        settingsAnchorRef.current?.contains(target)
+      ) {
+        return
+      }
+      setSettingsOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeSettingsOutside)
+    return () => {
+      document.removeEventListener('pointerdown', closeSettingsOutside)
+    }
+  }, [settingsOpen])
+
+  useEffect(() => {
     const viewer = viewerRef.current
     if (!viewer) return
     if (currentBookIdRef.current !== bookRecord.id) {
@@ -260,6 +281,7 @@ export function ReaderPage({
     let effectBook: EpubBook | null = null
     let effectRendition: EpubRendition | null = null
     let removeContentScrollBridge: (() => void) | undefined
+    let removeContentSettingsDismissal: (() => void) | undefined
     let removeRelocationListener: (() => void) | undefined
     let updateScrolledChapterProgress: (() => void) | undefined
     let currentChapterLabel = bookRecord.chapterLabel
@@ -304,6 +326,31 @@ export function ReaderPage({
         effectRendition = rendition
         renditionRef.current = rendition
         registerReaderTheme(rendition, theme, fontSize, readerFlow)
+
+        const settingsDocuments = new Set<Document>()
+        function attachSettingsDismissal(
+          _section: unknown,
+          view: { document?: Document },
+        ) {
+          const contentDocument = view.document
+          if (!contentDocument || settingsDocuments.has(contentDocument)) return
+          settingsDocuments.add(contentDocument)
+          contentDocument.addEventListener('pointerdown', closeReaderSettings)
+        }
+        function closeReaderSettings() {
+          setSettingsOpen(false)
+        }
+        rendition.on('rendered', attachSettingsDismissal)
+        removeContentSettingsDismissal = () => {
+          rendition.off('rendered', attachSettingsDismissal)
+          settingsDocuments.forEach((contentDocument) => {
+            contentDocument.removeEventListener(
+              'pointerdown',
+              closeReaderSettings,
+            )
+          })
+          settingsDocuments.clear()
+        }
 
         if (readerFlow !== 'paginated') {
           const contentDocuments = new Set<Document>()
@@ -549,6 +596,7 @@ export function ReaderPage({
       clearTimeout(persistTimer)
       persistReadingState()
       removeContentScrollBridge?.()
+      removeContentSettingsDismissal?.()
       removeRelocationListener?.()
       effectRendition?.destroy()
       effectBook?.destroy()
@@ -672,7 +720,7 @@ export function ReaderPage({
                 <List aria-hidden="true" size={18} strokeWidth={1.7} />
                 <span>目录</span>
               </button>
-              <div className="settings-anchor">
+              <div className="settings-anchor" ref={settingsAnchorRef}>
                 <button
                   className="reader-tool-button"
                   type="button"
