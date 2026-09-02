@@ -2079,6 +2079,7 @@
   position: relative;
   min-width: 0;
   height: 100svh;
+  container: reader-main / inline-size;
   overflow: hidden;
   background: var(--reader-surface);
 }
@@ -2099,8 +2100,10 @@
 .reader-context {
   min-width: 0;
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 9px;
+  overflow: hidden;
   color: var(--reader-muted);
   font-size: 13.5px;
   white-space: nowrap;
@@ -2124,6 +2127,7 @@
 
 .reader-tools {
   display: flex;
+  flex: 0 0 auto;
   justify-self: auto;
   gap: 10px;
   align-items: center;
@@ -2132,6 +2136,7 @@
 .reader-tool-button {
   min-height: 38px;
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
   padding: 0 12px;
@@ -2140,6 +2145,7 @@
   background: transparent;
   color: inherit;
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
   transition: background-color 160ms ease;
 }
@@ -2345,6 +2351,34 @@
   height: 100%;
   display: block;
   background: #315d4b;
+}
+
+@container reader-main (max-width: 860px) {
+  .reader-header {
+    gap: 10px;
+  }
+
+  .reader-tools {
+    gap: 4px;
+  }
+
+  .reader-tool-button {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .reader-tool-button > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }
 
 @media (max-width: 780px) {
