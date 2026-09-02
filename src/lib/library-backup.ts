@@ -5,6 +5,12 @@ import {
   restoreLibraryBackupEntries,
 } from './book-storage'
 import { createBookFingerprint } from './book-fingerprint'
+import {
+  BOOK_READING_STATUSES,
+  MAX_BOOK_TAG_LENGTH,
+  MAX_BOOK_TAGS,
+  normalizeBookTags,
+} from './book-organization'
 import type { BookRecord, LibraryBackupEntry } from '../types/book'
 import type {
   LibraryBackupConflict,
@@ -95,12 +101,53 @@ function readOptionalNumber(
   return field
 }
 
+function readOptionalBoolean(
+  value: Record<string, unknown>,
+  key: string,
+): boolean | undefined {
+  const field = value[key]
+  if (field === undefined) return undefined
+  if (typeof field !== 'boolean') {
+    throw new Error('备份中的书籍信息不完整。')
+  }
+  return field
+}
+
+function readOptionalTags(
+  value: Record<string, unknown>,
+): string[] | undefined {
+  const field = value.tags
+  if (field === undefined) return undefined
+  if (
+    !Array.isArray(field) ||
+    field.length > MAX_BOOK_TAGS ||
+    field.some(
+      (tag) =>
+        typeof tag !== 'string' ||
+        !tag.trim() ||
+        tag.length > MAX_BOOK_TAG_LENGTH,
+    )
+  ) {
+    throw new Error('备份中的书籍标签无效。')
+  }
+  return normalizeBookTags(field)
+}
+
 function parseBookRecord(value: unknown): BookRecord {
   if (!isObject(value)) throw new Error('备份中的书籍信息不完整。')
 
   const progress = readRequiredNumber(value, 'progress')
   if (progress < 0 || progress > 1) {
     throw new Error('备份中的阅读进度无效。')
+  }
+  const readingStatus = readOptionalString(value, 'readingStatus')
+  if (
+    readingStatus !== undefined &&
+    !BOOK_READING_STATUSES.includes(
+      readingStatus as (typeof BOOK_READING_STATUSES)[number],
+    )
+  ) {
+    throw new Error('备份中的阅读状态无效。')
   }
 
   return {
@@ -116,6 +163,9 @@ function parseBookRecord(value: unknown): BookRecord {
     location: readOptionalString(value, 'location'),
     chapterLabel: readOptionalString(value, 'chapterLabel'),
     coverDataUrl: readOptionalString(value, 'coverDataUrl'),
+    readingStatus: readingStatus as BookRecord['readingStatus'],
+    isFavorite: readOptionalBoolean(value, 'isFavorite'),
+    tags: readOptionalTags(value),
   }
 }
 

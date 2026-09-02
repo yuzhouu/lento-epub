@@ -1,10 +1,16 @@
-import { BookOpen, Trash2 } from 'lucide-react'
+import { BookOpen, Settings2, Star, Trash2 } from 'lucide-react'
 import { formatBytes } from '../../lib/format-bytes'
+import {
+  BOOK_READING_STATUS_LABELS,
+  getBookReadingStatus,
+} from '../../lib/book-organization'
 import type { BookRecord } from '../../types/book'
 
 interface BookRowProps {
   book: BookRecord
+  isManaged: boolean
   onOpen: (id: string) => void
+  onManage: (id: string) => void
   onRequestDelete: (book: BookRecord) => void
 }
 
@@ -18,11 +24,19 @@ function formatDate(timestamp: number | undefined): string {
   }).format(timestamp)
 }
 
-export function BookRow({ book, onOpen, onRequestDelete }: BookRowProps) {
+export function BookRow({
+  book,
+  isManaged,
+  onOpen,
+  onManage,
+  onRequestDelete,
+}: BookRowProps) {
   const progress = Math.round(book.progress * 100)
+  const readingStatus = getBookReadingStatus(book)
+  const tags = book.tags ?? []
 
   return (
-    <article className="book-row">
+    <article className={`book-row${isManaged ? ' is-managed' : ''}`}>
       <button
         className="book-open-button"
         type="button"
@@ -47,12 +61,52 @@ export function BookRow({ book, onOpen, onRequestDelete }: BookRowProps) {
               ? `上次阅读 · ${book.chapterLabel}`
               : '尚未开始阅读'}
           </p>
-          <time dateTime={book.lastOpenedAt?.toString()}>
+          <time
+            dateTime={
+              book.lastOpenedAt
+                ? new Date(book.lastOpenedAt).toISOString()
+                : undefined
+            }
+          >
             {formatDate(book.lastOpenedAt)}
           </time>
+          <div
+            className="book-tag-preview"
+            aria-label={tags.length ? '书籍标签' : undefined}
+          >
+            {tags.map((tag) => (
+              <span key={tag}>{tag}</span>
+            ))}
+          </div>
         </div>
       </button>
       <div className="book-row-aside">
+        <div className="book-row-state">
+          <span className={`book-status-badge status-${readingStatus}`}>
+            {BOOK_READING_STATUS_LABELS[readingStatus]}
+          </span>
+          {book.isFavorite ? (
+            <span className="book-favorite-indicator" title="已收藏">
+              <Star
+                aria-label="已收藏"
+                size={14}
+                strokeWidth={1.7}
+                fill="currentColor"
+              />
+            </span>
+          ) : null}
+        </div>
+        <button
+          className={`book-manage-button${isManaged ? ' is-active' : ''}`}
+          type="button"
+          aria-label={`管理《${book.title}》`}
+          aria-controls="book-details-sidebar"
+          aria-expanded={isManaged}
+          onClick={() => onManage(book.id)}
+        >
+          <Settings2 aria-hidden="true" size={14} strokeWidth={1.7} />
+          <span>管理</span>
+        </button>
         <dl className="book-stats">
           <div>
             <dt>阅读进度</dt>

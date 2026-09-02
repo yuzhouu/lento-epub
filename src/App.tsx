@@ -4,6 +4,8 @@ import {
   deleteBook,
   getBooks,
   restoreDeletedBook,
+  updateBookOrganization,
+  type BookOrganizationPatch,
 } from './lib/book-storage'
 import type { BookRecord, DeletedBookEntry } from './types/book'
 
@@ -52,6 +54,15 @@ export function App() {
     setBooks((current) =>
       current.map((book) => (book.id === updatedBook.id ? updatedBook : book)),
     )
+  }
+
+  async function handleBookOrganizationUpdate(
+    id: string,
+    patch: BookOrganizationPatch,
+  ): Promise<void> {
+    const updatedBook = await updateBookOrganization(id, patch)
+    if (!updatedBook) throw new Error('找不到这本书。')
+    handleBookUpdate(updatedBook)
   }
 
   async function handleDelete(
@@ -110,6 +121,7 @@ export function App() {
       onRestored={handleRestored}
       onDelete={handleDelete}
       onUndoDelete={handleUndoDelete}
+      onUpdateBook={handleBookOrganizationUpdate}
       onOpen={handleOpen}
     />
   )

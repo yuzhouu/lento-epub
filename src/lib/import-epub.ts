@@ -78,6 +78,9 @@ async function prepareEpub(
       fingerprint,
       addedAt,
       progress: 0,
+      readingStatus: 'unread',
+      isFavorite: false,
+      tags: [],
     }
 
     return { book, data }

@@ -1,6 +1,20 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { BookOpenText, Files, TriangleAlert } from 'lucide-react'
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+} from 'react'
+import {
+  BookOpenText,
+  Files,
+  Search,
+  Star,
+  TriangleAlert,
+} from 'lucide-react'
 import { BookRow } from './BookRow'
+import { BookDetailsSidebar } from './BookDetailsSidebar'
 import { DeleteBookDialog } from './DeleteBookDialog'
 import { ImportBookButton, useBookImport } from './ImportBookButton'
 import { InstallAppButton } from './InstallAppButton'
@@ -11,10 +25,20 @@ import {
 import { LibraryBackupActions } from './LibraryBackupActions'
 import {
   getLibraryStorageInfo,
+  type BookOrganizationPatch,
   type LibraryStorageInfo,
 } from '../../lib/book-storage'
+import {
+  BOOK_READING_STATUS_LABELS,
+  BOOK_READING_STATUSES,
+  getBookReadingStatus,
+} from '../../lib/book-organization'
 import { formatBytes } from '../../lib/format-bytes'
-import type { BookRecord, DeletedBookEntry } from '../../types/book'
+import type {
+  BookReadingStatus,
+  BookRecord,
+  DeletedBookEntry,
+} from '../../types/book'
 
 interface LibraryPageProps {
   books: BookRecord[]
@@ -22,7 +46,26 @@ interface LibraryPageProps {
   onRestored: (books: BookRecord[]) => void
   onDelete: (id: string) => Promise<DeletedBookEntry | undefined>
   onUndoDelete: (entry: DeletedBookEntry) => Promise<void>
+  onUpdateBook: (id: string, patch: BookOrganizationPatch) => Promise<void>
   onOpen: (id: string) => void
+}
+
+type LibrarySort = 'recent' | 'added' | 'progress'
+type ReadingStatusFilter = 'all' | BookReadingStatus
+
+const LIBRARY_SORT_LABELS: Record<LibrarySort, string> = {
+  recent: '最近阅读',
+  added: '添加时间',
+  progress: '阅读进度',
+}
+
+const READING_STATUS_FILTERS: readonly ReadingStatusFilter[] = [
+  'all',
+  ...BOOK_READING_STATUSES,
+]
+
+function normalizeSearchValue(value: string): string {
+  return value.trim().toLocaleLowerCase('zh-CN')
 }
 
 function containsFiles(event: DragEvent<HTMLElement>): boolean {
@@ -42,6 +85,7 @@ export function LibraryPage({
   onRestored,
   onDelete,
   onUndoDelete,
+  onUpdateBook,
   onOpen,
 }: LibraryPageProps) {
   const dragDepthRef = useRef(0)
@@ -51,6 +95,14 @@ export function LibraryPage({
   const [deletedEntry, setDeletedEntry] = useState<DeletedBookEntry>()
   const [libraryNotice, setLibraryNotice] = useState<LibraryAlertNotice>()
   const [storageInfo, setStorageInfo] = useState<LibraryStorageInfo>()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<LibrarySort>('recent')
+  const [statusFilter, setStatusFilter] =
+    useState<ReadingStatusFilter>('all')
+  const [favoriteOnly, setFavoriteOnly] = useState(false)
+  const [activeTag, setActiveTag] = useState<string>()
+  const [managedBookId, setManagedBookId] = useState<string>()
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const importer = useBookImport(onImported, setLibraryNotice)
 
   useEffect(() => {
@@ -105,6 +157,7 @@ export function LibraryPage({
       const deleted = await onDelete(bookToDelete.id)
       setBookToDelete(undefined)
       if (deleted) {
+        if (deleted.book.id === managedBookId) setManagedBookId(undefined)
         setDeletedEntry(deleted.data ? deleted : undefined)
         if (!deleted.data) {
           setLibraryNotice({
@@ -148,6 +201,110 @@ export function LibraryPage({
     }
   }
 
+  async function handleUpdateBook(
+    id: string,
+    patch: BookOrganizationPatch,
+  ): Promise<void> {
+    setLibraryNotice(undefined)
+    try {
+      await onUpdateBook(id, patch)
+    } catch (updateError) {
+      setLibraryNotice({
+        kind: 'error',
+        message:
+          updateError instanceof Error
+            ? updateError.message
+            : '更新书籍信息失败。',
+      })
+      throw updateError
+    }
+  }
+
+  function clearLibraryFilters() {
+    setSearchQuery('')
+    setStatusFilter('all')
+    setFavoriteOnly(false)
+    setActiveTag(undefined)
+  }
+
+  const allTags = useMemo(() => {
+    const tagsByKey = new Map<string, string>()
+    for (const book of books) {
+      for (const tag of book.tags ?? []) {
+        const key = normalizeSearchValue(tag)
+        if (key && !tagsByKey.has(key)) tagsByKey.set(key, tag)
+      }
+    }
+    return [...tagsByKey.values()].sort((left, right) =>
+      left.localeCompare(right, 'zh-CN'),
+    )
+  }, [books])
+
+  const effectiveActiveTag =
+    activeTag && allTags.includes(activeTag) ? activeTag : undefined
+  const visibleBooks = useMemo(() => {
+    const queryTokens = normalizeSearchValue(deferredSearchQuery)
+      .split(/\s+/)
+      .filter(Boolean)
+    const activeTagKey = effectiveActiveTag
+      ? normalizeSearchValue(effectiveActiveTag)
+      : undefined
+    const filtered = books.filter((book) => {
+      if (
+        queryTokens.length > 0 &&
+        !queryTokens.every((token) =>
+          normalizeSearchValue(`${book.title} ${book.author}`).includes(token),
+        )
+      ) {
+        return false
+      }
+      if (
+        statusFilter !== 'all' &&
+        getBookReadingStatus(book) !== statusFilter
+      ) {
+        return false
+      }
+      if (favoriteOnly && !book.isFavorite) return false
+      if (
+        activeTagKey &&
+        !(book.tags ?? []).some(
+          (tag) => normalizeSearchValue(tag) === activeTagKey,
+        )
+      ) {
+        return false
+      }
+      return true
+    })
+
+    return filtered.sort((left, right) => {
+      if (sortBy === 'added') return right.addedAt - left.addedAt
+      if (sortBy === 'progress') {
+        return right.progress - left.progress || right.addedAt - left.addedAt
+      }
+      return (
+        (right.lastOpenedAt ?? 0) - (left.lastOpenedAt ?? 0) ||
+        right.addedAt - left.addedAt
+      )
+    })
+  }, [
+    books,
+    deferredSearchQuery,
+    effectiveActiveTag,
+    favoriteOnly,
+    sortBy,
+    statusFilter,
+  ])
+
+  const hasActiveFilters = Boolean(
+    searchQuery ||
+      statusFilter !== 'all' ||
+      favoriteOnly ||
+      effectiveActiveTag,
+  )
+  const managedBook = managedBookId
+    ? books.find((book) => book.id === managedBookId)
+    : undefined
+
   const usagePercent =
     storageInfo?.usedBytes !== undefined && storageInfo.quotaBytes
       ? Math.min(100, (storageInfo.usedBytes / storageInfo.quotaBytes) * 100)
@@ -188,7 +345,11 @@ export function LibraryPage({
         <div className="section-heading">
           <div className="library-heading-copy">
             <h2 id="library-title">我的书架</h2>
-            <span>{books.length} 本书</span>
+            <span>
+              {hasActiveFilters
+                ? `${visibleBooks.length} / ${books.length} 本书`
+                : `${books.length} 本书`}
+            </span>
             <div
               className={`library-storage-overview${
                 storageInfo?.isLow ? ' is-low' : ''
@@ -236,16 +397,163 @@ export function LibraryPage({
         ) : null}
 
         {books.length ? (
-          <div className="book-list">
-            {books.map((book) => (
-              <BookRow
-                key={book.id}
-                book={book}
-                onOpen={onOpen}
-                onRequestDelete={setBookToDelete}
-              />
-            ))}
-          </div>
+          <>
+            <div className="library-management" aria-label="管理书架">
+              <div className="library-management-primary">
+                <label className="library-search-field">
+                  <Search aria-hidden="true" size={17} strokeWidth={1.7} />
+                  <span className="visually-hidden">搜索书名或作者</span>
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    placeholder="搜索书名或作者"
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                  />
+                </label>
+                <label className="library-sort-field">
+                  <span>排序</span>
+                  <select
+                    value={sortBy}
+                    onChange={(event) =>
+                      setSortBy(event.target.value as LibrarySort)
+                    }
+                  >
+                    {Object.entries(LIBRARY_SORT_LABELS).map(
+                      ([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+              </div>
+
+              <div className="library-filter-row">
+                <div
+                  className="library-status-filters"
+                  role="group"
+                  aria-label="按阅读状态筛选"
+                >
+                  {READING_STATUS_FILTERS.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      className={statusFilter === status ? 'is-active' : ''}
+                      aria-pressed={statusFilter === status}
+                      onClick={() => setStatusFilter(status)}
+                    >
+                      {status === 'all'
+                        ? '全部'
+                        : BOOK_READING_STATUS_LABELS[status]}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className={`library-favorite-filter${
+                    favoriteOnly ? ' is-active' : ''
+                  }`}
+                  type="button"
+                  aria-pressed={favoriteOnly}
+                  onClick={() => setFavoriteOnly((current) => !current)}
+                >
+                  <Star
+                    aria-hidden="true"
+                    size={14}
+                    strokeWidth={1.7}
+                    fill={favoriteOnly ? 'currentColor' : 'none'}
+                  />
+                  收藏
+                </button>
+                {hasActiveFilters ? (
+                  <button
+                    className="library-clear-filters"
+                    type="button"
+                    onClick={clearLibraryFilters}
+                  >
+                    清除筛选
+                  </button>
+                ) : null}
+              </div>
+
+              {allTags.length ? (
+                <div className="library-tag-filters" aria-label="按标签筛选">
+                  <span>标签</span>
+                  <div>
+                    {allTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={
+                          effectiveActiveTag === tag ? 'is-active' : ''
+                        }
+                        aria-pressed={effectiveActiveTag === tag}
+                        onClick={() =>
+                          setActiveTag((current) =>
+                            current === tag ? undefined : tag,
+                          )
+                        }
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div
+              className={`library-books-layout${
+                managedBook ? ' has-sidebar' : ''
+              }`}
+            >
+              <div className="library-book-results">
+                {visibleBooks.length ? (
+                  <div
+                    className="book-list"
+                    aria-busy={searchQuery !== deferredSearchQuery}
+                  >
+                    {visibleBooks.map((book) => (
+                      <BookRow
+                        key={book.id}
+                        book={book}
+                        isManaged={managedBook?.id === book.id}
+                        onOpen={onOpen}
+                        onManage={(id) =>
+                          setManagedBookId((current) =>
+                            current === id ? undefined : id,
+                          )
+                        }
+                        onRequestDelete={setBookToDelete}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-library empty-library-filtered">
+                    <Search aria-hidden="true" size={34} strokeWidth={1.25} />
+                    <h2>没有找到符合条件的书</h2>
+                    <p>换一个关键词，或清除当前筛选。</p>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={clearLibraryFilters}
+                    >
+                      清除筛选
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {managedBook ? (
+                <BookDetailsSidebar
+                  key={managedBook.id}
+                  book={managedBook}
+                  onClose={() => setManagedBookId(undefined)}
+                  onUpdate={handleUpdateBook}
+                />
+              ) : null}
+            </div>
+          </>
         ) : (
           <div className="empty-library">
             <BookOpenText aria-hidden="true" size={40} strokeWidth={1.2} />

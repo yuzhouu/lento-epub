@@ -5,6 +5,7 @@ import type {
   LibraryBackupEntry,
 } from '../types/book'
 import { createBookFingerprint } from './book-fingerprint'
+import { getBookReadingStatus, normalizeBookTags } from './book-organization'
 
 const DATABASE_NAME = 'lento-library'
 const DATABASE_VERSION = 3
@@ -623,6 +624,45 @@ export async function updateBookReadingState(
     ...existing,
     ...state,
     lastOpenedAt: Date.now(),
+    readingStatus:
+      state.progress >= 0.995
+        ? 'finished'
+        : getBookReadingStatus(existing) === 'finished'
+          ? 'finished'
+          : 'reading',
+  }
+  store.put(nextBook)
+  await transactionToPromise(transaction)
+  return nextBook
+}
+
+export type BookOrganizationPatch = Partial<
+  Pick<BookRecord, 'readingStatus' | 'isFavorite' | 'tags'>
+>
+
+export async function updateBookOrganization(
+  id: string,
+  patch: BookOrganizationPatch,
+): Promise<BookRecord | undefined> {
+  const database = await openDatabase()
+  const transaction = database.transaction(BOOK_STORE, 'readwrite')
+  const store = transaction.objectStore(BOOK_STORE)
+  const existing = await requestToPromise(
+    store.get(id) as IDBRequest<BookRecord | undefined>,
+  )
+
+  if (!existing) {
+    transaction.abort()
+    return undefined
+  }
+
+  const nextBook: BookRecord = {
+    ...existing,
+    ...patch,
+    tags:
+      patch.tags === undefined
+        ? existing.tags
+        : normalizeBookTags(patch.tags),
   }
   store.put(nextBook)
   await transactionToPromise(transaction)

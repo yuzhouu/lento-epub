@@ -1,3 +1,5 @@
+export type BookReadingStatus = 'unread' | 'reading' | 'finished'
+
 export interface BookRecord {
   id: string
   title: string
@@ -11,6 +13,9 @@ export interface BookRecord {
   progress: number
   location?: string
   chapterLabel?: string
+  readingStatus?: BookReadingStatus
+  isFavorite?: boolean
+  tags?: string[]
 }
 
 export interface BookFileRecord {
