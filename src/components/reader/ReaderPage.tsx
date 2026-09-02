@@ -4,10 +4,6 @@ import {
   updateReadingHighlight,
 } from '../../data/indexed-db/reading-asset-repository'
 import {
-  downloadReadingAssets,
-  type ReadingAssetExportFormat,
-} from '../../lib/reading-asset-export'
-import {
   NOTE_HIGHLIGHT_COLOR,
 } from '../../lib/reading-highlight-colors'
 import {
@@ -640,10 +636,6 @@ export function ReaderPage({
     if (window.innerWidth < 780) setTocOpen(false)
   }
 
-  function handleExportAssets(format: ReadingAssetExportFormat) {
-    downloadReadingAssets(bookRecord, readingAssets, format)
-  }
-
   const currentBookmark = readingAssets.find(
     (asset) =>
       asset.kind === 'bookmark' && asset.cfi === currentLocationRef.current,
@@ -768,7 +760,6 @@ export function ReaderPage({
                 onBack={onBack}
                 onClose={() => setTocOpen(false)}
                 onDelete={handleDeleteAsset}
-                onExport={handleExportAssets}
                 onSelect={handleSelectAsset}
                 onShowSearch={() => setNavigationPanel('search')}
                 onShowToc={() => setNavigationPanel('toc')}

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
-  Download,
   List,
   NotebookPen,
   PanelLeftClose,
@@ -12,7 +11,6 @@ import type {
   ReadingAsset,
   ReadingHighlight,
 } from '../../types/book'
-import type { ReadingAssetExportFormat } from '../../lib/reading-asset-export'
 import { ReadingAssetListItem } from '../../features/reading-assets/components/ReadingAssetListItem'
 
 interface ReadingAssetsPanelProps {
@@ -24,7 +22,6 @@ interface ReadingAssetsPanelProps {
   onBack: () => void
   onClose: () => void
   onDelete: (asset: ReadingAsset) => Promise<boolean>
-  onExport: (format: ReadingAssetExportFormat) => void
   onSelect: (asset: ReadingAsset) => void
   onShowSearch: () => void
   onShowToc: () => void
@@ -43,7 +40,6 @@ export function ReadingAssetsPanel({
   onBack,
   onClose,
   onDelete,
-  onExport,
   onSelect,
   onShowSearch,
   onShowToc,
@@ -140,30 +136,6 @@ export function ReadingAssetsPanel({
       </div>
 
       <div className="reading-assets-content">
-        <header className="reading-assets-heading">
-          <div>
-            <span>本书阅读资产</span>
-            <strong>{assets.length} 条记录</strong>
-          </div>
-          <div className="reading-assets-export" aria-label="导出阅读记录">
-            <button
-              type="button"
-              disabled={assets.length === 0}
-              onClick={() => onExport('markdown')}
-            >
-              <Download aria-hidden="true" size={14} strokeWidth={1.7} />
-              Markdown
-            </button>
-            <button
-              type="button"
-              disabled={assets.length === 0}
-              onClick={() => onExport('text')}
-            >
-              纯文本
-            </button>
-          </div>
-        </header>
-
         {errorMessage ? (
           <p className="reading-assets-error" role="alert">
             {errorMessage}
