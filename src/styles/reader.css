@@ -1242,8 +1242,8 @@
 }
 
 .highlight-style-option {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   display: grid;
   flex: none;
   place-items: center;
@@ -1257,8 +1257,8 @@
 }
 
 .highlight-style-option svg {
-  width: 17px;
-  height: 11px;
+  width: 14px;
+  height: 9px;
   overflow: visible;
 }
 
@@ -1555,13 +1555,13 @@
 }
 
 .selection-editor .highlight-style-option {
-  width: 25px;
-  height: 25px;
+  width: 21px;
+  height: 21px;
 }
 
 .selection-editor .highlight-style-option svg {
-  width: 19px;
-  height: 12px;
+  width: 16px;
+  height: 10px;
 }
 
 .selection-editor-colors .highlight-color {
