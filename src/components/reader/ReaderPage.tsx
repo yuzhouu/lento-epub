@@ -1,15 +1,37 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import ePub from 'epubjs'
 import {
+  Bookmark,
   ChevronLeft,
   ChevronRight,
   List,
+  NotebookPen,
   PanelLeftOpen,
   Search,
   Settings,
+  X,
 } from 'lucide-react'
-import { getBookFile, updateBookReadingState } from '../../lib/book-storage'
+import {
+  deleteReadingAsset,
+  getBookFile,
+  getReadingAssets,
+  saveReadingAsset,
+  updateBookReadingState,
+  updateReadingHighlight,
+} from '../../lib/book-storage'
 import { sanitizeEpubFontSources } from '../../lib/epub-font-sanitizer'
+import {
+  downloadReadingAssets,
+  type ReadingAssetExportFormat,
+} from '../../lib/reading-asset-export'
+import {
+  NOTE_HIGHLIGHT_COLOR,
+  QUICK_HIGHLIGHT_COLOR_OPTIONS,
+} from '../../lib/reading-highlight-colors'
+import {
+  DEFAULT_READING_HIGHLIGHT_STYLE,
+  READING_HIGHLIGHT_STYLE_OPTIONS,
+} from '../../lib/reading-highlight-styles'
 import {
   DEFAULT_READER_FONT,
   getReaderFontFamily,
@@ -29,8 +51,14 @@ import {
   type BookSearchResult,
 } from './BookSearchPanel'
 import { TocPanel } from './TocPanel'
+import { ReadingAssetsPanel } from './ReadingAssetsPanel'
+import { ReadingHighlightStyleIcon } from './ReadingHighlightStyleIcon'
 import type {
   BookRecord,
+  ReadingAsset,
+  ReadingHighlight,
+  ReadingHighlightColor,
+  ReadingHighlightStyle,
   ReaderLocation,
   TocItem,
 } from '../../types/book'
@@ -38,7 +66,14 @@ import type {
 type EpubBook = ReturnType<typeof ePub>
 type EpubRendition = ReturnType<EpubBook['renderTo']>
 type EpubSection = ReturnType<EpubBook['spine']['get']>
-type NavigationPanel = 'toc' | 'search'
+type NavigationPanel = 'toc' | 'search' | 'assets'
+
+interface PendingSelection {
+  cfi: string
+  text: string
+  href?: string
+  chapterLabel?: string
+}
 
 interface ReaderPageProps {
   bookRecord: BookRecord
@@ -69,6 +104,248 @@ const CLICK_PAGINATION_STORAGE_KEY = 'lento:click-pagination:v1'
 const DEFAULT_READER_FONT_SIZE = 18
 const MIN_READER_FONT_SIZE = 15
 const MAX_READER_FONT_SIZE = 26
+const HIGHLIGHT_STROKES: Record<ReadingHighlightColor, string> = {
+  yellow: '#d3a600',
+  orange: '#e97c18',
+  lime: '#78a91f',
+  green: '#229866',
+  cyan: '#168fa9',
+  blue: '#4f7fd1',
+  rose: '#d95470',
+  violet: '#8461d1',
+}
+
+interface EpubSvgMark {
+  element?: SVGGElement
+  render?: () => void
+  lentoDecorationAttached?: boolean
+}
+
+interface EpubAnnotationHandle {
+  mark?: EpubSvgMark
+  on(event: 'attach', listener: (mark: EpubSvgMark) => void): void
+}
+
+function createSvgElement<K extends keyof SVGElementTagNameMap>(
+  document: Document,
+  name: K,
+): SVGElementTagNameMap[K] {
+  return document.createElementNS('http://www.w3.org/2000/svg', name)
+}
+
+function createWavyUnderlinePath(x: number, y: number, width: number): string {
+  const end = x + width
+  const halfWaveWidth = 4.6
+  const amplitude = 1.5
+  let cursor = x
+  let direction = -1
+  let path = `M ${x} ${y}`
+
+  while (cursor < end) {
+    const next = Math.min(cursor + halfWaveWidth, end)
+    const span = next - cursor
+    const waveY = y + direction * amplitude
+    path += ` C ${cursor + span * 0.28} ${waveY} ${cursor + span * 0.72} ${waveY} ${next} ${y}`
+    cursor = next
+    direction *= -1
+  }
+
+  return path
+}
+
+function decorateReadingMark(
+  mark: EpubSvgMark,
+  highlight: ReadingHighlight,
+) {
+  const group = mark.element
+  if (!group) return
+
+  group
+    .querySelectorAll('.lento-annotation-decoration')
+    .forEach((element) => element.remove())
+
+  const stroke = HIGHLIGHT_STROKES[highlight.color]
+  const lineStyle =
+    highlight.lineStyle ?? DEFAULT_READING_HIGHLIGHT_STYLE
+  const geometryRects = Array.from(group.children).filter(
+    (element): element is SVGRectElement =>
+      element.tagName.toLocaleLowerCase() === 'rect',
+  )
+
+  geometryRects.forEach((rect) => {
+    const x = Number(rect.getAttribute('x'))
+    const y = Number(rect.getAttribute('y'))
+    const width = Number(rect.getAttribute('width'))
+    const height = Number(rect.getAttribute('height'))
+    if (![x, y, width, height].every(Number.isFinite) || width <= 0) return
+
+    rect.setAttribute('fill', 'transparent')
+    rect.setAttribute('stroke', 'none')
+
+    if (lineStyle === 'double') {
+      const bottomOffsets = [3.25, 1.05]
+      bottomOffsets.forEach((bottomOffset) => {
+        const line = createSvgElement(group.ownerDocument, 'line')
+        line.classList.add(
+          'lento-annotation-decoration',
+          'lento-annotation-double',
+        )
+        line.setAttribute('x1', String(x))
+        line.setAttribute('x2', String(x + width))
+        line.setAttribute('y1', String(y + height - bottomOffset))
+        line.setAttribute('y2', String(y + height - bottomOffset))
+        line.setAttribute('stroke', stroke)
+        line.setAttribute('stroke-width', '1.25')
+        line.setAttribute('stroke-linecap', 'round')
+        line.setAttribute('vector-effect', 'non-scaling-stroke')
+        group.append(line)
+      })
+      return
+    }
+
+    if (lineStyle === 'single') {
+      const line = createSvgElement(group.ownerDocument, 'line')
+      line.classList.add(
+        'lento-annotation-decoration',
+        'lento-annotation-single',
+      )
+      line.setAttribute('x1', String(x))
+      line.setAttribute('x2', String(x + width))
+      line.setAttribute('y1', String(y + height - 1.2))
+      line.setAttribute('y2', String(y + height - 1.2))
+      line.setAttribute('stroke', stroke)
+      line.setAttribute('stroke-width', '1.7')
+      line.setAttribute('stroke-linecap', 'round')
+      line.setAttribute('vector-effect', 'non-scaling-stroke')
+      group.append(line)
+      return
+    }
+
+    const path = createSvgElement(group.ownerDocument, 'path')
+    path.classList.add(
+      'lento-annotation-decoration',
+      'lento-annotation-wave',
+    )
+    path.setAttribute(
+      'd',
+      createWavyUnderlinePath(x, y + height - 1.5, width),
+    )
+    path.setAttribute('fill', 'none')
+    path.setAttribute('stroke', stroke)
+    path.setAttribute('stroke-width', '1.7')
+    path.setAttribute('stroke-linecap', 'round')
+    path.setAttribute('stroke-linejoin', 'round')
+    path.setAttribute('vector-effect', 'non-scaling-stroke')
+    group.append(path)
+  })
+}
+
+function attachReadingMarkDecoration(
+  mark: EpubSvgMark,
+  highlight: ReadingHighlight,
+) {
+  if (!mark.render || mark.lentoDecorationAttached) {
+    decorateReadingMark(mark, highlight)
+    return
+  }
+
+  const render = mark.render.bind(mark)
+  mark.render = () => {
+    render()
+    decorateReadingMark(mark, highlight)
+  }
+  mark.lentoDecorationAttached = true
+  decorateReadingMark(mark, highlight)
+}
+
+function renderReadingHighlight(
+  rendition: EpubRendition,
+  highlight: ReadingHighlight,
+  onOpen: (highlight: ReadingHighlight) => void,
+) {
+  const annotation = rendition.annotations.highlight(
+    highlight.cfi,
+    { assetId: highlight.id },
+    () => onOpen(highlight),
+    'lento-reading-highlight',
+    {
+      fill: 'transparent',
+      'fill-opacity': '0',
+      'mix-blend-mode': 'normal',
+    },
+  ) as unknown as EpubAnnotationHandle | undefined
+  if (!annotation) return
+  const decorate = (mark: EpubSvgMark) =>
+    attachReadingMarkDecoration(mark, highlight)
+  annotation.on('attach', decorate)
+  if (annotation.mark) decorate(annotation.mark)
+}
+
+function attachReadingHighlightHover(contentDocument: Document) {
+  const frameElement = contentDocument.defaultView?.frameElement
+  if (!(frameElement instanceof HTMLIFrameElement)) return () => undefined
+  const iframe = frameElement
+
+  let hoverFrame: number | undefined
+  let pointerX = 0
+  let pointerY = 0
+  let hoveredMark: SVGGElement | undefined
+
+  function clearHoveredMark() {
+    hoveredMark?.classList.remove('is-hovered')
+    hoveredMark = undefined
+  }
+
+  function updateHoveredMark() {
+    hoverFrame = undefined
+    const frameBounds = iframe.getBoundingClientRect()
+    const pointX = frameBounds.left + pointerX
+    const pointY = frameBounds.top + pointerY
+    const nextHoveredMark = Array.from(
+      iframe.parentElement?.querySelectorAll<SVGGElement>(
+        'g.lento-reading-highlight',
+      ) ?? [],
+    ).find((group) =>
+      Array.from(group.children).some((element) => {
+        if (element.tagName.toLocaleLowerCase() !== 'rect') return false
+        const bounds = element.getBoundingClientRect()
+        return (
+          pointX >= bounds.left &&
+          pointX <= bounds.right &&
+          pointY >= bounds.top &&
+          pointY <= bounds.bottom
+        )
+      }),
+    )
+    if (nextHoveredMark === hoveredMark) return
+    clearHoveredMark()
+    nextHoveredMark?.classList.add('is-hovered')
+    hoveredMark = nextHoveredMark
+  }
+
+  function handlePointerMove(event: PointerEvent) {
+    pointerX = event.clientX
+    pointerY = event.clientY
+    if (hoverFrame !== undefined) return
+    hoverFrame = requestAnimationFrame(updateHoveredMark)
+  }
+
+  function handlePointerLeave() {
+    cancelAnimationFrame(hoverFrame ?? 0)
+    hoverFrame = undefined
+    clearHoveredMark()
+  }
+
+  contentDocument.addEventListener('pointermove', handlePointerMove, {
+    passive: true,
+  })
+  contentDocument.addEventListener('pointerleave', handlePointerLeave)
+  return () => {
+    contentDocument.removeEventListener('pointermove', handlePointerMove)
+    contentDocument.removeEventListener('pointerleave', handlePointerLeave)
+    handlePointerLeave()
+  }
+}
 
 const READER_LINE_HEIGHTS: Record<ReaderLineHeight, number> = {
   compact: 1.72,
@@ -458,6 +735,25 @@ export function ReaderPage({
   const tocRef = useRef<TocItem[]>([])
   const currentLocationRef = useRef(bookRecord.location)
   const currentBookIdRef = useRef(bookRecord.id)
+  const pendingSelectionRef = useRef<PendingSelection | undefined>(undefined)
+  const pendingSelectionWindowRef = useRef<Window | undefined>(undefined)
+  const pendingNoteRef = useRef('')
+  const pendingNoteDirtyRef = useRef(false)
+  const pendingNoteSaveTimerRef = useRef<
+    ReturnType<typeof setTimeout> | undefined
+  >(undefined)
+  const pendingColorRef = useRef<ReadingHighlightColor | undefined>(undefined)
+  const pendingLineStyleRef = useRef<ReadingHighlightStyle>(
+    DEFAULT_READING_HIGHLIGHT_STYLE,
+  )
+  const pendingLineStyleDirtyRef = useRef(false)
+  const pendingExistingHighlightRef = useRef<ReadingHighlight | undefined>(
+    undefined,
+  )
+  const pendingSelectionVersionRef = useRef(0)
+  const isSavingSelectionRef = useRef(false)
+  const closePendingSelectionAfterSaveRef = useRef(false)
+  const selectionDraftsRef = useRef<Map<string, string>>(new Map())
   const [toc, setToc] = useState<TocItem[]>([])
   const [tocOpen, setTocOpen] = useState(() => window.innerWidth >= 980)
   const [navigationPanel, setNavigationPanel] =
@@ -486,11 +782,29 @@ export function ReaderPage({
   )
   const [theme, setTheme] = useState<ReaderTheme>(getInitialReaderTheme)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [readingAssets, setReadingAssets] = useState<ReadingAsset[]>([])
+  const [activeAssetId, setActiveAssetId] = useState<string>()
+  const [activeAssetFocusVersion, setActiveAssetFocusVersion] = useState(0)
+  const [pendingSelection, setPendingSelection] = useState<PendingSelection>()
+  const [pendingNote, setPendingNote] = useState('')
+  const [pendingColor, setPendingColor] = useState<ReadingHighlightColor>()
+  const [pendingLineStyle, setPendingLineStyle] =
+    useState<ReadingHighlightStyle>(DEFAULT_READING_HIGHLIGHT_STYLE)
+  const [isSavingSelection, setIsSavingSelection] = useState(false)
+  const [isSavingBookmark, setIsSavingBookmark] = useState(false)
+  const [readingAssetError, setReadingAssetError] = useState<string>()
   const [isOpening, setIsOpening] = useState(true)
   const [openingMessage, setOpeningMessage] = useState('正在读取书籍…')
   const [error, setError] = useState<string>()
+  const tocOpenRef = useRef(tocOpen)
+  const navigationPanelRef = useRef(navigationPanel)
 
   keyboardPaginationRef.current = keyboardPagination
+  pendingNoteRef.current = pendingNote
+  pendingColorRef.current = pendingColor
+  pendingLineStyleRef.current = pendingLineStyle
+  tocOpenRef.current = tocOpen
+  navigationPanelRef.current = navigationPanel
 
   useEffect(() => {
     return () => {
@@ -501,6 +815,7 @@ export function ReaderPage({
       if (searchSourceRef.current?.bookId === bookRecord.id) {
         searchSourceRef.current = undefined
       }
+      clearPendingNoteSaveTimer()
     }
   }, [bookRecord.id])
 
@@ -525,6 +840,38 @@ export function ReaderPage({
   }, [settingsOpen])
 
   useEffect(() => {
+    if (!pendingSelection) return
+
+    function handleOutsidePointerDown(event: PointerEvent) {
+      const target = event.target
+      if (
+        target instanceof Element &&
+        target.closest('.selection-editor')
+      ) {
+        return
+      }
+      dismissPendingSelection()
+    }
+
+    function handlePendingSelectionKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      dismissPendingSelection()
+    }
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true)
+    document.addEventListener('keydown', handlePendingSelectionKeyDown)
+    return () => {
+      document.removeEventListener(
+        'pointerdown',
+        handleOutsidePointerDown,
+        true,
+      )
+      document.removeEventListener('keydown', handlePendingSelectionKeyDown)
+    }
+  }, [pendingSelection?.cfi])
+
+  useEffect(() => {
     function handleSearchShortcut(event: KeyboardEvent) {
       if (
         event.key.toLocaleLowerCase() !== 'f' ||
@@ -534,6 +881,7 @@ export function ReaderPage({
         return
       }
       event.preventDefault()
+      dismissPendingSelection()
       setSettingsOpen(false)
       setNavigationPanel('search')
       setTocOpen(true)
@@ -547,8 +895,13 @@ export function ReaderPage({
     const viewer = viewerRef.current
     if (!viewer) return
     if (currentBookIdRef.current !== bookRecord.id) {
+      cancelPendingSelection()
+      selectionDraftsRef.current.clear()
       currentBookIdRef.current = bookRecord.id
       currentLocationRef.current = bookRecord.location
+      setReadingAssets([])
+      setActiveAssetId(undefined)
+      setPendingSelection(undefined)
       setChapterProgress(0)
       setAtChapterStart(false)
       setAtChapterEnd(false)
@@ -565,8 +918,10 @@ export function ReaderPage({
     let removeContentScrollBridge: (() => void) | undefined
     let removeContentSettingsDismissal: (() => void) | undefined
     let removeRelocationListener: (() => void) | undefined
+    let removeSelectionListener: (() => void) | undefined
     let updateScrolledChapterProgress: (() => void) | undefined
     let currentChapterLabel = bookRecord.chapterLabel
+    let currentChapterHref: string | undefined
     let persistTimer: ReturnType<typeof setTimeout> | undefined
     let pendingReadingState:
       | Pick<BookRecord, 'progress' | 'location' | 'chapterLabel'>
@@ -591,9 +946,13 @@ export function ReaderPage({
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
         if (isCancelled) return
 
-        const data = await getBookFile(bookRecord.id)
+        const [data, storedReadingAssets] = await Promise.all([
+          getBookFile(bookRecord.id),
+          getReadingAssets(bookRecord.id),
+        ])
         if (!data) throw new Error('找不到原始 EPUB 文件。')
         if (isCancelled) return
+        setReadingAssets(storedReadingAssets)
         searchSourceRef.current = { bookId: bookRecord.id, data }
         setOpeningMessage('正在排版正文…')
 
@@ -628,14 +987,68 @@ export function ReaderPage({
           paragraphStyle,
         )
 
+        storedReadingAssets.forEach((asset) => {
+          if (asset.kind === 'highlight') {
+            renderReadingHighlight(
+              rendition,
+              asset,
+              handleReadingHighlightOpen,
+            )
+          }
+        })
+
+        function handleTextSelected(
+          cfi: string,
+          contents: { window?: Window },
+        ) {
+          const contentWindow = contents.window
+          const selection = contentWindow?.getSelection()
+          const text = selection?.toString().replace(/\s+/g, ' ').trim()
+          if (!text || !contentWindow) return
+
+          replacePendingSelection(contentWindow)
+          const draft = selectionDraftsRef.current.get(cfi)
+          const nextSelection = {
+            cfi,
+            text,
+            href: currentChapterHref,
+            chapterLabel: currentChapterLabel,
+          }
+          const nextNote = draft ?? ''
+          pendingSelectionRef.current = nextSelection
+          pendingSelectionWindowRef.current = contentWindow
+          pendingNoteRef.current = nextNote
+          pendingNoteDirtyRef.current = Boolean(nextNote.trim())
+          pendingColorRef.current = undefined
+          pendingLineStyleRef.current = DEFAULT_READING_HIGHLIGHT_STYLE
+          pendingLineStyleDirtyRef.current = false
+          pendingExistingHighlightRef.current = undefined
+          pendingSelectionVersionRef.current += 1
+          setPendingNote(nextNote)
+          setPendingColor(undefined)
+          setPendingLineStyle(DEFAULT_READING_HIGHLIGHT_STYLE)
+          setPendingSelection(nextSelection)
+        }
+        rendition.on('selected', handleTextSelected)
+        removeSelectionListener = () => {
+          rendition.off('selected', handleTextSelected)
+        }
+
         const settingsDocuments = new Set<Document>()
+        const readingHighlightHoverCleanups = new Map<Document, () => void>()
         function handlePaginationKeyDown(event: KeyboardEvent) {
+          if (event.key === 'Escape' && pendingSelectionRef.current) {
+            event.preventDefault()
+            dismissPendingSelection()
+            return
+          }
           if (
             event.key.toLocaleLowerCase() === 'f' &&
             (event.ctrlKey || event.metaKey) &&
             !event.altKey
           ) {
             event.preventDefault()
+            dismissPendingSelection()
             setSettingsOpen(false)
             setNavigationPanel('search')
             setTocOpen(true)
@@ -669,8 +1082,19 @@ export function ReaderPage({
           const contentDocument = view.document
           if (!contentDocument || settingsDocuments.has(contentDocument)) return
           settingsDocuments.add(contentDocument)
-          contentDocument.addEventListener('pointerdown', closeReaderSettings)
+          readingHighlightHoverCleanups.set(
+            contentDocument,
+            attachReadingHighlightHover(contentDocument),
+          )
+          contentDocument.addEventListener(
+            'pointerdown',
+            handleContentPointerDown,
+          )
           contentDocument.addEventListener('keydown', handlePaginationKeyDown)
+        }
+        function handleContentPointerDown() {
+          closeReaderSettings()
+          dismissPendingSelection()
         }
         function closeReaderSettings() {
           setSettingsOpen(false)
@@ -679,15 +1103,17 @@ export function ReaderPage({
         removeContentSettingsDismissal = () => {
           rendition.off('rendered', attachSettingsDismissal)
           settingsDocuments.forEach((contentDocument) => {
+            readingHighlightHoverCleanups.get(contentDocument)?.()
             contentDocument.removeEventListener(
               'pointerdown',
-              closeReaderSettings,
+              handleContentPointerDown,
             )
             contentDocument.removeEventListener(
               'keydown',
               handlePaginationKeyDown,
             )
           })
+          readingHighlightHoverCleanups.clear()
           settingsDocuments.clear()
         }
 
@@ -861,6 +1287,7 @@ export function ReaderPage({
             location.start.href,
           )
           setCurrentHref(location.start.href)
+          currentChapterHref = location.start.href
           if (readerFlow === 'paginated') {
             const nextChapterProgress = getChapterProgress(location)
             setChapterProgress(nextChapterProgress)
@@ -937,6 +1364,7 @@ export function ReaderPage({
       removeContentScrollBridge?.()
       removeContentSettingsDismissal?.()
       removeRelocationListener?.()
+      removeSelectionListener?.()
       effectRendition?.destroy()
       effectBook?.destroy()
       releaseSanitizedFontStyles?.()
@@ -972,7 +1400,7 @@ export function ReaderPage({
   ])
 
   useEffect(() => {
-    if (readerFlow !== 'paginated' || typeof ResizeObserver === 'undefined') {
+    if (typeof ResizeObserver === 'undefined') {
       return
     }
 
@@ -1105,7 +1533,457 @@ export function ReaderPage({
     return results
   }
 
+  function handleReadingHighlightOpen(highlight: ReadingHighlight) {
+    setActiveAssetId(highlight.id)
+    setReadingAssetError(undefined)
+    setSettingsOpen(false)
+    if (
+      tocOpenRef.current &&
+      navigationPanelRef.current === 'assets'
+    ) {
+      setActiveAssetFocusVersion((version) => version + 1)
+      dismissPendingSelection()
+      return
+    }
+
+    openReadingHighlightEditor(highlight)
+  }
+
+  function openReadingHighlightEditor(highlight: ReadingHighlight) {
+    try {
+      pendingSelectionWindowRef.current?.getSelection()?.removeAllRanges()
+    } catch {
+      // The previous content document may have unloaded during navigation.
+    }
+
+    const nextSelection: PendingSelection = {
+      cfi: highlight.cfi,
+      text: highlight.text,
+      href: highlight.href,
+      chapterLabel: highlight.chapterLabel,
+    }
+    selectionDraftsRef.current.delete(highlight.cfi)
+    pendingSelectionRef.current = nextSelection
+    pendingSelectionWindowRef.current = undefined
+    pendingNoteRef.current = highlight.note ?? ''
+    pendingNoteDirtyRef.current = false
+    pendingColorRef.current = highlight.color
+    pendingLineStyleRef.current =
+      highlight.lineStyle ?? DEFAULT_READING_HIGHLIGHT_STYLE
+    pendingLineStyleDirtyRef.current = false
+    pendingExistingHighlightRef.current = highlight
+    pendingSelectionVersionRef.current += 1
+    setPendingSelection(nextSelection)
+    setPendingNote(highlight.note ?? '')
+    setPendingColor(highlight.color)
+    setPendingLineStyle(
+      highlight.lineStyle ?? DEFAULT_READING_HIGHLIGHT_STYLE,
+    )
+  }
+
+  function resetPendingSelection(options: {
+    preserveDraft: boolean
+    clearNativeSelection: boolean
+  }) {
+    clearPendingNoteSaveTimer()
+    const pending = pendingSelectionRef.current
+    if (!pending) return
+
+    const note = pendingNoteRef.current.trim()
+    if (
+      options.preserveDraft &&
+      note &&
+      !pendingExistingHighlightRef.current
+    ) {
+      selectionDraftsRef.current.set(pending.cfi, note)
+    } else {
+      selectionDraftsRef.current.delete(pending.cfi)
+    }
+
+    if (options.clearNativeSelection) {
+      try {
+        pendingSelectionWindowRef.current?.getSelection()?.removeAllRanges()
+      } catch {
+        // The content document may already have been unloaded after navigation.
+      }
+    }
+    pendingSelectionRef.current = undefined
+    pendingSelectionWindowRef.current = undefined
+    pendingNoteRef.current = ''
+    pendingNoteDirtyRef.current = false
+    pendingColorRef.current = undefined
+    pendingLineStyleRef.current = DEFAULT_READING_HIGHLIGHT_STYLE
+    pendingLineStyleDirtyRef.current = false
+    pendingExistingHighlightRef.current = undefined
+    closePendingSelectionAfterSaveRef.current = false
+    pendingSelectionVersionRef.current += 1
+    setPendingSelection(undefined)
+    setPendingNote('')
+    setPendingColor(undefined)
+    setPendingLineStyle(DEFAULT_READING_HIGHLIGHT_STYLE)
+    setReadingAssetError(undefined)
+  }
+
+  function replacePendingSelection(contentWindow: Window) {
+    resetPendingSelection({
+      preserveDraft: true,
+      clearNativeSelection:
+        pendingSelectionWindowRef.current !== contentWindow,
+    })
+  }
+
+  function clearPendingNoteSaveTimer() {
+    clearTimeout(pendingNoteSaveTimerRef.current)
+    pendingNoteSaveTimerRef.current = undefined
+  }
+
+  function schedulePendingNoteSave() {
+    clearPendingNoteSaveTimer()
+    pendingNoteSaveTimerRef.current = setTimeout(() => {
+      pendingNoteSaveTimerRef.current = undefined
+      const selection = pendingSelectionRef.current
+      const existing = pendingExistingHighlightRef.current
+      if (
+        !selection ||
+        !pendingNoteDirtyRef.current ||
+        (!pendingNoteRef.current.trim() && !existing)
+      ) {
+        return
+      }
+      void handleSaveSelection(
+        pendingColorRef.current ?? existing?.color ?? NOTE_HIGHLIGHT_COLOR,
+      )
+    }, 500)
+  }
+
+  function dismissPendingSelection() {
+    const existing = pendingExistingHighlightRef.current
+    const shouldSaveNote =
+      pendingNoteDirtyRef.current &&
+      (Boolean(pendingNoteRef.current.trim()) || Boolean(existing))
+    const shouldSaveLineStyle =
+      pendingLineStyleDirtyRef.current && Boolean(existing)
+
+    if (shouldSaveNote || shouldSaveLineStyle) {
+      void handleSaveSelection(
+        pendingColorRef.current ?? existing?.color ?? NOTE_HIGHLIGHT_COLOR,
+        true,
+      )
+      return
+    }
+    resetPendingSelection({
+      preserveDraft: true,
+      clearNativeSelection: true,
+    })
+  }
+
+  function cancelPendingSelection() {
+    resetPendingSelection({
+      preserveDraft: false,
+      clearNativeSelection: true,
+    })
+  }
+
+  function finishPendingSelection(version?: number) {
+    if (
+      version !== undefined &&
+      version !== pendingSelectionVersionRef.current
+    ) {
+      return
+    }
+    resetPendingSelection({
+      preserveDraft: false,
+      clearNativeSelection: true,
+    })
+  }
+
+  async function handleSaveSelection(
+    color: ReadingHighlightColor,
+    closeAfterSave = false,
+  ) {
+    const selection = pendingSelectionRef.current
+    if (!selection) return
+    if (isSavingSelectionRef.current) {
+      if (closeAfterSave) closePendingSelectionAfterSaveRef.current = true
+      return
+    }
+    clearPendingNoteSaveTimer()
+    const note = pendingNoteRef.current
+    const lineStyle = pendingLineStyleRef.current
+    const selectionVersion = pendingSelectionVersionRef.current
+    const previousColor = pendingColorRef.current
+    pendingColorRef.current = color
+    setPendingColor(color)
+    isSavingSelectionRef.current = true
+    setIsSavingSelection(true)
+    setReadingAssetError(undefined)
+
+    try {
+      const existing =
+        pendingExistingHighlightRef.current ??
+        readingAssets.find(
+          (asset): asset is ReadingHighlight =>
+            asset.kind === 'highlight' && asset.cfi === selection.cfi,
+        )
+      if (existing) {
+        const updated = await updateReadingHighlight(existing.id, {
+          color,
+          lineStyle,
+          note,
+          text: selection.text,
+        })
+        if (!updated) throw new Error('这条划线已经不存在。')
+        pendingExistingHighlightRef.current = updated
+        if (renditionRef.current) {
+          renditionRef.current.annotations.remove(existing.cfi, 'highlight')
+          renderReadingHighlight(
+            renditionRef.current,
+            updated,
+            handleReadingHighlightOpen,
+          )
+        }
+        setReadingAssets((current) =>
+          current.map((asset) => (asset.id === updated.id ? updated : asset)),
+        )
+      } else {
+        const now = Date.now()
+        const highlight: ReadingHighlight = {
+          id: crypto.randomUUID(),
+          bookId: bookRecord.id,
+          kind: 'highlight',
+          cfi: selection.cfi,
+          href: selection.href,
+          chapterLabel: selection.chapterLabel,
+          text: selection.text,
+          color,
+          lineStyle,
+          note: note.trim() || undefined,
+          createdAt: now,
+          updatedAt: now,
+        }
+        await saveReadingAsset(highlight)
+        pendingExistingHighlightRef.current = highlight
+        if (renditionRef.current) {
+          renderReadingHighlight(
+            renditionRef.current,
+            highlight,
+            handleReadingHighlightOpen,
+          )
+        }
+        setReadingAssets((current) => [highlight, ...current])
+      }
+
+      selectionDraftsRef.current.delete(selection.cfi)
+      try {
+        pendingSelectionWindowRef.current?.getSelection()?.removeAllRanges()
+      } catch {
+        // The content document may have unloaded while the asset was saved.
+      }
+      pendingSelectionWindowRef.current = undefined
+      if (pendingNoteRef.current === note) pendingNoteDirtyRef.current = false
+      if (pendingLineStyleRef.current === lineStyle) {
+        pendingLineStyleDirtyRef.current = false
+      }
+
+      const shouldClose =
+        closeAfterSave || closePendingSelectionAfterSaveRef.current
+      closePendingSelectionAfterSaveRef.current = false
+      const hasNewerChanges =
+        pendingNoteDirtyRef.current || pendingLineStyleDirtyRef.current
+      if (shouldClose && hasNewerChanges) {
+        closePendingSelectionAfterSaveRef.current = true
+      } else if (shouldClose) {
+        finishPendingSelection(selectionVersion)
+      }
+    } catch (saveError) {
+      pendingColorRef.current = previousColor
+      setPendingColor(previousColor)
+      closePendingSelectionAfterSaveRef.current = false
+      if (selectionVersion === pendingSelectionVersionRef.current) {
+        setReadingAssetError(
+          saveError instanceof Error ? saveError.message : '保存划线失败。',
+        )
+      }
+    } finally {
+      isSavingSelectionRef.current = false
+      setIsSavingSelection(false)
+      if (
+        closePendingSelectionAfterSaveRef.current &&
+        selectionVersion === pendingSelectionVersionRef.current
+      ) {
+        closePendingSelectionAfterSaveRef.current = false
+        void handleSaveSelection(
+          pendingColorRef.current ?? NOTE_HIGHLIGHT_COLOR,
+          true,
+        )
+      }
+    }
+  }
+
+  async function handlePendingLineStyleChange(
+    lineStyle: ReadingHighlightStyle,
+  ) {
+    if (
+      isSavingSelectionRef.current ||
+      pendingLineStyleRef.current === lineStyle
+    ) {
+      return
+    }
+
+    const previousLineStyle = pendingLineStyleRef.current
+    const existing = pendingExistingHighlightRef.current
+    pendingLineStyleRef.current = lineStyle
+    pendingLineStyleDirtyRef.current = true
+    setPendingLineStyle(lineStyle)
+    if (!existing) return
+
+    pendingLineStyleDirtyRef.current = false
+    isSavingSelectionRef.current = true
+    setIsSavingSelection(true)
+    setReadingAssetError(undefined)
+
+    try {
+      const updated = await updateReadingHighlight(existing.id, { lineStyle })
+      if (!updated) throw new Error('这条划线已经不存在。')
+      pendingExistingHighlightRef.current = updated
+      setReadingAssets((current) =>
+        current.map((asset) => (asset.id === updated.id ? updated : asset)),
+      )
+      if (renditionRef.current) {
+        renditionRef.current.annotations.remove(existing.cfi, 'highlight')
+        renderReadingHighlight(
+          renditionRef.current,
+          updated,
+          handleReadingHighlightOpen,
+        )
+      }
+    } catch (updateError) {
+      pendingLineStyleRef.current = previousLineStyle
+      setPendingLineStyle(previousLineStyle)
+      setReadingAssetError(
+        updateError instanceof Error
+          ? updateError.message
+          : '更新划线样式失败。',
+      )
+    } finally {
+      isSavingSelectionRef.current = false
+      setIsSavingSelection(false)
+      if (pendingNoteDirtyRef.current) schedulePendingNoteSave()
+    }
+  }
+
+  async function handleDeleteAsset(asset: ReadingAsset): Promise<boolean> {
+    setReadingAssetError(undefined)
+    try {
+      await deleteReadingAsset(asset.id)
+      if (asset.kind === 'highlight') {
+        renditionRef.current?.annotations.remove(asset.cfi, 'highlight')
+      }
+      setReadingAssets((current) =>
+        current.filter((currentAsset) => currentAsset.id !== asset.id),
+      )
+      setActiveAssetId((current) =>
+        current === asset.id ? undefined : current,
+      )
+      return true
+    } catch (deleteError) {
+      setReadingAssetError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : '删除阅读记录失败。',
+      )
+      return false
+    }
+  }
+
+  async function handleUpdateHighlight(
+    highlight: ReadingHighlight,
+    patch: Partial<Pick<ReadingHighlight, 'color' | 'lineStyle' | 'note'>>,
+  ): Promise<boolean> {
+    setReadingAssetError(undefined)
+    try {
+      const updated = await updateReadingHighlight(highlight.id, patch)
+      if (!updated) throw new Error('这条划线已经不存在。')
+      setReadingAssets((current) =>
+        current.map((asset) => (asset.id === updated.id ? updated : asset)),
+      )
+      if (
+        renditionRef.current &&
+        (patch.color !== undefined ||
+          patch.lineStyle !== undefined ||
+          patch.note !== undefined)
+      ) {
+        renditionRef.current.annotations.remove(highlight.cfi, 'highlight')
+        renderReadingHighlight(
+          renditionRef.current,
+          updated,
+          handleReadingHighlightOpen,
+        )
+      }
+      return true
+    } catch (updateError) {
+      setReadingAssetError(
+        updateError instanceof Error ? updateError.message : '更新划线失败。',
+      )
+      return false
+    }
+  }
+
+  function handleSelectAsset(asset: ReadingAsset) {
+    dismissPendingSelection()
+    setActiveAssetId(asset.id)
+    void renditionRef.current?.display(asset.cfi)
+    if (window.innerWidth < 780) setTocOpen(false)
+  }
+
+  function handleExportAssets(format: ReadingAssetExportFormat) {
+    downloadReadingAssets(bookRecord, readingAssets, format)
+  }
+
+  const currentBookmark = readingAssets.find(
+    (asset) =>
+      asset.kind === 'bookmark' && asset.cfi === currentLocationRef.current,
+  )
+
+  async function handleToggleBookmark() {
+    const cfi = currentLocationRef.current
+    if (!cfi || isSavingBookmark) return
+    setIsSavingBookmark(true)
+    setReadingAssetError(undefined)
+    try {
+      if (currentBookmark) {
+        await deleteReadingAsset(currentBookmark.id)
+        setReadingAssets((current) =>
+          current.filter((asset) => asset.id !== currentBookmark.id),
+        )
+      } else {
+        const now = Date.now()
+        const bookmark: ReadingAsset = {
+          id: crypto.randomUUID(),
+          bookId: bookRecord.id,
+          kind: 'bookmark',
+          cfi,
+          href: currentHref,
+          chapterLabel,
+          createdAt: now,
+          updatedAt: now,
+        }
+        await saveReadingAsset(bookmark)
+        setReadingAssets((current) => [bookmark, ...current])
+      }
+    } catch (bookmarkError) {
+      setReadingAssetError(
+        bookmarkError instanceof Error
+          ? bookmarkError.message
+          : '保存书签失败。',
+      )
+    } finally {
+      setIsSavingBookmark(false)
+    }
+  }
+
   function handleNavigationToggle(panel: NavigationPanel) {
+    dismissPendingSelection()
     setSettingsOpen(false)
     if (tocOpen && navigationPanel === panel) {
       setTocOpen(false)
@@ -1116,6 +1994,7 @@ export function ReaderPage({
   }
 
   function displayChapter(href: string) {
+    dismissPendingSelection()
     setChapterProgress(0)
     setAtChapterStart(false)
     setAtChapterEnd(false)
@@ -1124,6 +2003,7 @@ export function ReaderPage({
   }
 
   function displaySearchResult(result: BookSearchResult) {
+    dismissPendingSelection()
     setChapterProgress(0)
     setAtChapterStart(false)
     setAtChapterEnd(false)
@@ -1132,6 +2012,7 @@ export function ReaderPage({
   }
 
   function handleReaderFlowChange(flow: ReaderFlow) {
+    dismissPendingSelection()
     setAtChapterStart(false)
     setAtChapterEnd(false)
     setReaderFlow(flow)
@@ -1226,6 +2107,7 @@ export function ReaderPage({
     readerFlow !== 'continuous' && atChapterEnd && Boolean(nextChapter)
 
   function handleForward() {
+    dismissPendingSelection()
     if (atChapterEnd && nextChapter) {
       displayChapter(nextChapter.href)
       return
@@ -1233,9 +2115,14 @@ export function ReaderPage({
     void renditionRef.current?.next()
   }
 
+  function handleBackward() {
+    dismissPendingSelection()
+    void renditionRef.current?.prev()
+  }
+
   paginationNavigationRef.current = (direction) => {
     if (direction === 'previous') {
-      void renditionRef.current?.prev()
+      handleBackward()
       return
     }
     handleForward()
@@ -1262,17 +2149,35 @@ export function ReaderPage({
                 currentHref={currentHref}
                 onBack={onBack}
                 onClose={() => setTocOpen(false)}
+                onShowAssets={() => setNavigationPanel('assets')}
                 onSearch={() => setNavigationPanel('search')}
                 onSelect={displayChapter}
               />
-            ) : (
+            ) : navigationPanel === 'search' ? (
               <BookSearchPanel
                 bookId={bookRecord.id}
                 onBack={onBack}
                 onClose={() => setTocOpen(false)}
                 onSearch={searchBookContent}
                 onSelect={displaySearchResult}
+                onShowAssets={() => setNavigationPanel('assets')}
                 onShowToc={() => setNavigationPanel('toc')}
+              />
+            ) : (
+              <ReadingAssetsPanel
+                book={bookRecord}
+                assets={readingAssets}
+                activeAssetId={activeAssetId}
+                activeAssetFocusVersion={activeAssetFocusVersion}
+                errorMessage={readingAssetError}
+                onBack={onBack}
+                onClose={() => setTocOpen(false)}
+                onDelete={handleDeleteAsset}
+                onExport={handleExportAssets}
+                onSelect={handleSelectAsset}
+                onShowSearch={() => setNavigationPanel('search')}
+                onShowToc={() => setNavigationPanel('toc')}
+                onUpdateHighlight={handleUpdateHighlight}
               />
             )}
             <button
@@ -1323,6 +2228,31 @@ export function ReaderPage({
               >
                 <Search aria-hidden="true" size={18} strokeWidth={1.7} />
                 <span>搜索</span>
+              </button>
+              <button
+                className="reader-tool-button"
+                type="button"
+                aria-pressed={tocOpen && navigationPanel === 'assets'}
+                onClick={() => handleNavigationToggle('assets')}
+              >
+                <NotebookPen aria-hidden="true" size={18} strokeWidth={1.7} />
+                <span>书摘</span>
+              </button>
+              <button
+                className="reader-tool-button reader-bookmark-button"
+                type="button"
+                aria-label={currentBookmark ? '移除当前页书签' : '为当前页添加书签'}
+                aria-pressed={Boolean(currentBookmark)}
+                disabled={!currentLocationRef.current || isSavingBookmark}
+                onClick={() => void handleToggleBookmark()}
+              >
+                <Bookmark
+                  aria-hidden="true"
+                  size={18}
+                  strokeWidth={1.7}
+                  fill={currentBookmark ? 'currentColor' : 'none'}
+                />
+                <span>{currentBookmark ? '已加书签' : '当前页书签'}</span>
               </button>
               <div className="settings-anchor" ref={settingsAnchorRef}>
                 <button
@@ -1381,6 +2311,93 @@ export function ReaderPage({
             ) : (
               <>
                 <div ref={viewerRef} className="epub-viewer" />
+                {pendingSelection && !isOpening ? (
+                  <aside
+                    className="selection-editor"
+                    role="dialog"
+                    aria-label="为选中文字添加划线和批注"
+                  >
+                    <div className="selection-editor-heading">
+                      <div>
+                        <span>划线与批注</span>
+                        <strong>{pendingSelection.chapterLabel || '当前章节'}</strong>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="关闭划线与批注"
+                        onClick={dismissPendingSelection}
+                      >
+                        <X aria-hidden="true" size={16} strokeWidth={1.7} />
+                      </button>
+                    </div>
+                    <blockquote>{pendingSelection.text}</blockquote>
+                    <div
+                      className="selection-editor-colors"
+                      aria-label="划线颜色"
+                    >
+                      {QUICK_HIGHLIGHT_COLOR_OPTIONS.map((color) => (
+                        <button
+                          key={color.value}
+                          className={`highlight-color is-${color.value}`}
+                          type="button"
+                          aria-label={color.label}
+                          aria-pressed={pendingColor === color.value}
+                          disabled={isSavingSelection}
+                          onClick={() =>
+                            void handleSaveSelection(color.value)
+                          }
+                        />
+                      ))}
+                    </div>
+                    <div
+                      className="highlight-style-options"
+                      aria-label="划线样式"
+                    >
+                      {READING_HIGHLIGHT_STYLE_OPTIONS.map((style) => (
+                        <button
+                          key={style.value}
+                          className="highlight-style-option"
+                          type="button"
+                          aria-label={style.label}
+                          aria-pressed={pendingLineStyle === style.value}
+                          disabled={isSavingSelection}
+                          onClick={() =>
+                            void handlePendingLineStyleChange(style.value)
+                          }
+                        >
+                          <ReadingHighlightStyleIcon style={style.value} />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={pendingNote}
+                      maxLength={2000}
+                      rows={3}
+                      placeholder="写下批注，离开后自动保存"
+                      onChange={(event) => {
+                        pendingNoteRef.current = event.target.value
+                        pendingNoteDirtyRef.current = true
+                        setPendingNote(event.target.value)
+                        schedulePendingNoteSave()
+                      }}
+                      onBlur={(event) => {
+                        const nextTarget = event.relatedTarget
+                        if (
+                          nextTarget instanceof Element &&
+                          nextTarget.closest('.selection-editor')
+                        ) {
+                          return
+                        }
+                        dismissPendingSelection()
+                      }}
+                    />
+                    {readingAssetError ? (
+                      <p className="selection-editor-error" role="alert">
+                        {readingAssetError}
+                      </p>
+                    ) : null}
+                  </aside>
+                ) : null}
                 {readerFlow === 'paginated' &&
                 clickPagination &&
                 !isOpening ? (
@@ -1445,7 +2462,7 @@ export function ReaderPage({
             {readerFlow === 'paginated' ? (
               <button
                 type="button"
-                onClick={() => void renditionRef.current?.prev()}
+                onClick={handleBackward}
               >
                 <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.5} />
                 上一页

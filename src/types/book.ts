@@ -1,5 +1,41 @@
 export type BookReadingStatus = 'unread' | 'reading' | 'finished'
 
+export type ReadingHighlightColor =
+  | 'yellow'
+  | 'orange'
+  | 'lime'
+  | 'green'
+  | 'cyan'
+  | 'blue'
+  | 'rose'
+  | 'violet'
+
+export type ReadingHighlightStyle = 'wave' | 'single' | 'double'
+
+interface ReadingAssetBase {
+  id: string
+  bookId: string
+  cfi: string
+  href?: string
+  chapterLabel?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ReadingBookmark extends ReadingAssetBase {
+  kind: 'bookmark'
+}
+
+export interface ReadingHighlight extends ReadingAssetBase {
+  kind: 'highlight'
+  text: string
+  color: ReadingHighlightColor
+  lineStyle?: ReadingHighlightStyle
+  note?: string
+}
+
+export type ReadingAsset = ReadingBookmark | ReadingHighlight
+
 export interface BookRecord {
   id: string
   title: string
@@ -31,6 +67,7 @@ export interface LibraryBackupEntry {
 export interface DeletedBookEntry {
   book: BookRecord
   data?: ArrayBuffer
+  readingAssets?: ReadingAsset[]
 }
 
 export interface TocItem {

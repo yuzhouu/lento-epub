@@ -3,15 +3,19 @@ import type {
   BookRecord,
   DeletedBookEntry,
   LibraryBackupEntry,
+  ReadingAsset,
+  ReadingHighlight,
 } from '../types/book'
 import { createBookFingerprint } from './book-fingerprint'
 import { getBookReadingStatus, normalizeBookTags } from './book-organization'
 
 const DATABASE_NAME = 'lento-library'
-const DATABASE_VERSION = 3
+const DATABASE_VERSION = 4
 const BOOK_STORE = 'books'
 const FILE_STORE = 'files'
+const READING_ASSET_STORE = 'reading-assets'
 const FINGERPRINT_INDEX = 'fingerprint'
+const BOOK_ID_INDEX = 'bookId'
 const LOW_STORAGE_BYTES = 100 * 1024 * 1024
 const LOW_STORAGE_RATIO = 0.05
 
@@ -72,6 +76,15 @@ function openDatabase(): Promise<IDBDatabase> {
       const fileStore = database.objectStoreNames.contains(FILE_STORE)
         ? upgradeTransaction.objectStore(FILE_STORE)
         : database.createObjectStore(FILE_STORE, { keyPath: 'id' })
+
+      const readingAssetStore = database.objectStoreNames.contains(
+        READING_ASSET_STORE,
+      )
+        ? upgradeTransaction.objectStore(READING_ASSET_STORE)
+        : database.createObjectStore(READING_ASSET_STORE, { keyPath: 'id' })
+      if (!readingAssetStore.indexNames.contains(BOOK_ID_INDEX)) {
+        readingAssetStore.createIndex(BOOK_ID_INDEX, BOOK_ID_INDEX)
+      }
 
       if (event.oldVersion < 3) {
         const cursorRequest = fileStore.openCursor()
@@ -356,18 +369,24 @@ export async function deleteBook(
 ): Promise<DeletedBookEntry | undefined> {
   const database = await openDatabase()
   const transaction = database.transaction(
-    [BOOK_STORE, FILE_STORE],
+    [BOOK_STORE, FILE_STORE, READING_ASSET_STORE],
     'readwrite',
   )
   const transactionComplete = transactionToPromise(transaction)
   const bookStore = transaction.objectStore(BOOK_STORE)
   const fileStore = transaction.objectStore(FILE_STORE)
-  const [book, file] = await Promise.all([
+  const readingAssetStore = transaction.objectStore(READING_ASSET_STORE)
+  const [book, file, readingAssets] = await Promise.all([
     requestToPromise(
       bookStore.get(id) as IDBRequest<BookRecord | undefined>,
     ),
     requestToPromise(
       fileStore.get(id) as IDBRequest<BookFileRecord | undefined>,
+    ),
+    requestToPromise(
+      readingAssetStore.index(BOOK_ID_INDEX).getAll(id) as IDBRequest<
+        ReadingAsset[]
+      >,
     ),
   ])
 
@@ -378,8 +397,9 @@ export async function deleteBook(
 
   bookStore.delete(id)
   fileStore.delete(id)
+  for (const asset of readingAssets) readingAssetStore.delete(asset.id)
   await transactionComplete
-  return { book, data: file?.data }
+  return { book, data: file?.data, readingAssets }
 }
 
 export async function restoreDeletedBook(
@@ -396,7 +416,7 @@ export async function restoreDeletedBook(
 
   const database = await openDatabase()
   const transaction = database.transaction(
-    [BOOK_STORE, FILE_STORE],
+    [BOOK_STORE, FILE_STORE, READING_ASSET_STORE],
     'readwrite',
   )
   const fileStore = transaction.objectStore(FILE_STORE)
@@ -409,6 +429,75 @@ export async function restoreDeletedBook(
     id: entry.book.id,
     data: entry.data,
   } satisfies BookFileRecord)
+  const readingAssetStore = transaction.objectStore(READING_ASSET_STORE)
+  for (const asset of entry.readingAssets ?? []) {
+    readingAssetStore.put(asset)
+  }
+  await transactionToPromise(transaction)
+}
+
+function sortReadingAssets(assets: ReadingAsset[]): ReadingAsset[] {
+  return [...assets].sort(
+    (left, right) => right.createdAt - left.createdAt,
+  )
+}
+
+export async function getReadingAssets(bookId: string): Promise<ReadingAsset[]> {
+  const database = await openDatabase()
+  const transaction = database.transaction(READING_ASSET_STORE, 'readonly')
+  const assets = await requestToPromise(
+    transaction.objectStore(READING_ASSET_STORE).index(BOOK_ID_INDEX).getAll(
+      bookId,
+    ) as IDBRequest<ReadingAsset[]>,
+  )
+  return sortReadingAssets(assets)
+}
+
+export async function saveReadingAsset(
+  asset: ReadingAsset,
+): Promise<ReadingAsset> {
+  const database = await openDatabase()
+  const transaction = database.transaction(READING_ASSET_STORE, 'readwrite')
+  transaction.objectStore(READING_ASSET_STORE).put(asset)
+  await transactionToPromise(transaction)
+  return asset
+}
+
+export async function updateReadingHighlight(
+  id: string,
+  patch: Partial<
+    Pick<ReadingHighlight, 'color' | 'lineStyle' | 'note' | 'text'>
+  >,
+): Promise<ReadingHighlight | undefined> {
+  const database = await openDatabase()
+  const transaction = database.transaction(READING_ASSET_STORE, 'readwrite')
+  const store = transaction.objectStore(READING_ASSET_STORE)
+  const existing = await requestToPromise(
+    store.get(id) as IDBRequest<ReadingAsset | undefined>,
+  )
+  if (!existing || existing.kind !== 'highlight') {
+    transaction.abort()
+    return undefined
+  }
+
+  const nextHighlight: ReadingHighlight = {
+    ...existing,
+    ...patch,
+    note:
+      patch.note === undefined
+        ? existing.note
+        : patch.note.trim() || undefined,
+    updatedAt: Date.now(),
+  }
+  store.put(nextHighlight)
+  await transactionToPromise(transaction)
+  return nextHighlight
+}
+
+export async function deleteReadingAsset(id: string): Promise<void> {
+  const database = await openDatabase()
+  const transaction = database.transaction(READING_ASSET_STORE, 'readwrite')
+  transaction.objectStore(READING_ASSET_STORE).delete(id)
   await transactionToPromise(transaction)
 }
 

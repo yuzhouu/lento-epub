@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Clock3,
   List,
+  NotebookPen,
   PanelLeftClose,
   Search,
   X,
@@ -36,6 +37,7 @@ interface BookSearchPanelProps {
     onProgress: (progress: SearchProgress) => void,
   ) => Promise<BookSearchResult[]>
   onSelect: (result: BookSearchResult) => void
+  onShowAssets: () => void
   onShowToc: () => void
 }
 
@@ -135,6 +137,7 @@ export function BookSearchPanel({
   onClose,
   onSearch,
   onSelect,
+  onShowAssets,
   onShowToc,
 }: BookSearchPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -224,7 +227,7 @@ export function BookSearchPanel({
         </button>
       </div>
 
-      <div className="navigation-tabs" aria-label="书内导航">
+      <div className="navigation-tabs has-three" aria-label="书内导航">
         <button type="button" onClick={onShowToc}>
           <List aria-hidden="true" size={15} strokeWidth={1.7} />
           目录
@@ -232,6 +235,10 @@ export function BookSearchPanel({
         <button className="is-active" type="button" aria-current="page">
           <Search aria-hidden="true" size={15} strokeWidth={1.7} />
           搜索
+        </button>
+        <button type="button" onClick={onShowAssets}>
+          <NotebookPen aria-hidden="true" size={15} strokeWidth={1.7} />
+          书摘
         </button>
       </div>
 
