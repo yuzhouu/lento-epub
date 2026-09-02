@@ -24,17 +24,11 @@ function canUseChromeFontSettings(): boolean {
   return (
     typeof chrome !== 'undefined' &&
     Boolean(chrome.runtime?.id) &&
-    typeof chrome.permissions?.request === 'function'
+    typeof chrome.fontSettings?.getFontList === 'function'
   )
 }
 
 async function queryChromeExtensionFonts(): Promise<string[]> {
-  const granted = await chrome.permissions.request({
-    permissions: ['fontSettings'],
-  })
-  if (!granted) throw new DOMException('Permission denied', 'NotAllowedError')
-  if (typeof chrome.fontSettings?.getFontList !== 'function') return []
-
   const fonts = await chrome.fontSettings.getFontList()
   return fonts.map((font) => font.displayName)
 }
