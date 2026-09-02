@@ -1,5 +1,8 @@
 import ePub from 'epubjs'
-import { saveImportedBooks, type ImportedBookEntry } from './book-storage'
+import {
+  saveImportedBooks,
+  type ImportedBookEntry,
+} from '../data/indexed-db/book-repository'
 import { createBookFingerprint } from './book-fingerprint'
 import type { BookRecord } from '../types/book'
 

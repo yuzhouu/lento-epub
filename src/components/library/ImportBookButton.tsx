@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
-import { getStorageErrorMessage } from '../../lib/book-storage'
+import { getStorageErrorMessage } from '../../data/indexed-db/storage-capacity'
 import type { LibraryAlertNotice } from './LibraryAlert'
 import type { BookRecord } from '../../types/book'
 import type { EpubImportResult } from '../../lib/import-epub'

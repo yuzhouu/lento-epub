@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { ArchiveRestore, Download } from 'lucide-react'
-import { getStorageErrorMessage } from '../../lib/book-storage'
+import { getStorageErrorMessage } from '../../data/indexed-db/storage-capacity'
 import { RestoreBackupDialog } from './RestoreBackupDialog'
 import type { LibraryAlertNotice } from './LibraryAlert'
 import type {

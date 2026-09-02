@@ -13,7 +13,7 @@ import {
   MAX_BOOK_TAG_LENGTH,
   MAX_BOOK_TAGS,
 } from '../../lib/book-organization'
-import type { BookOrganizationPatch } from '../../lib/book-storage'
+import type { BookOrganizationPatch } from '../../data/indexed-db/book-repository'
 import type { BookRecord } from '../../types/book'
 
 interface BookDetailsSidebarProps {

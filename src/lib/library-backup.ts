@@ -3,7 +3,7 @@ import {
   getLibraryBackupConflicts,
   getLibraryBackupEntries,
   restoreLibraryBackupEntries,
-} from './book-storage'
+} from '../data/indexed-db/library-backup-repository'
 import { createBookFingerprint } from './book-fingerprint'
 import {
   BOOK_READING_STATUSES,
@@ -16,7 +16,7 @@ import type {
   LibraryBackupConflict,
   LibraryBackupConflictResolution,
   RestoreLibraryBackupResult,
-} from './book-storage'
+} from '../data/indexed-db/library-backup-repository'
 
 const BACKUP_FORMAT = 'lento-library-backup'
 const BACKUP_VERSION = 1

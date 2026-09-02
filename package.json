@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --mode web --host 127.0.0.1 --port 4178",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && npm run build:web && npm run build:extension",
     "build:web": "vite build --mode web",
@@ -25,7 +26,8 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "typescript": "^6.0.2",
-    "vite": "^8.0.0"
+    "vite": "^8.0.0",
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "@xmldom/xmldom": "^0.8.13"

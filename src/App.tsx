@@ -6,7 +6,7 @@ import {
   restoreDeletedBook,
   updateBookOrganization,
   type BookOrganizationPatch,
-} from './lib/book-storage'
+} from './data/indexed-db/book-repository'
 import type { BookRecord, DeletedBookEntry } from './types/book'
 
 const ReaderPage = lazy(() =>
