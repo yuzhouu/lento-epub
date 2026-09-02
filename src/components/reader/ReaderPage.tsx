@@ -9,6 +9,7 @@ import {
   PanelLeftOpen,
   Search,
   Settings,
+  Trash2,
   X,
 } from 'lucide-react'
 import {
@@ -1656,6 +1657,20 @@ export function ReaderPage({
     }, 500)
   }
 
+  async function handleDeletePendingHighlight() {
+    const existing = pendingExistingHighlightRef.current
+    if (!existing || isSavingSelectionRef.current) return
+    clearPendingNoteSaveTimer()
+    isSavingSelectionRef.current = true
+    setIsSavingSelection(true)
+    try {
+      if (await handleDeleteAsset(existing)) finishPendingSelection()
+    } finally {
+      isSavingSelectionRef.current = false
+      setIsSavingSelection(false)
+    }
+  }
+
   function dismissPendingSelection() {
     const existing = pendingExistingHighlightRef.current
     const shouldSaveNote =
@@ -2322,6 +2337,21 @@ export function ReaderPage({
                         <span>划线与批注</span>
                         <strong>{pendingSelection.chapterLabel || '当前章节'}</strong>
                       </div>
+                      {pendingExistingHighlightRef.current ? (
+                        <button
+                          className="selection-editor-delete"
+                          type="button"
+                          aria-label="删除划线和批注"
+                          disabled={isSavingSelection}
+                          onClick={() => void handleDeletePendingHighlight()}
+                        >
+                          <Trash2
+                            aria-hidden="true"
+                            size={15}
+                            strokeWidth={1.65}
+                          />
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         aria-label="关闭划线与批注"

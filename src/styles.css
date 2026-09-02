@@ -3299,12 +3299,13 @@ button:focus-visible,
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 4px;
 }
 
 .selection-editor-heading > div {
   display: grid;
   gap: 2px;
+  margin-right: auto;
 }
 
 .selection-editor-heading span {
@@ -3332,6 +3333,16 @@ button:focus-visible,
 
 .selection-editor-heading > button:hover {
   background: var(--reader-hover);
+}
+
+.selection-editor-heading > .selection-editor-delete:hover:not(:disabled) {
+  color: #9a4e43;
+  background: rgba(154, 78, 67, 0.1);
+}
+
+.selection-editor-heading > button:disabled {
+  cursor: wait;
+  opacity: 0.5;
 }
 
 .selection-editor blockquote {
