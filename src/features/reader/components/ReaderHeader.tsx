@@ -62,7 +62,7 @@ export function ReaderHeader({
         ) : null}
         <strong>{title}</strong>
         <span aria-hidden="true">/</span>
-        <span>{chapterLabel || '正在打开…'}</span>
+        <span title={chapterLabel}>{chapterLabel || '正在打开…'}</span>
       </div>
       <div className="reader-tools">
         <button

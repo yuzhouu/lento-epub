@@ -26,6 +26,7 @@ function TocEntries({
   depth?: number
 }) {
   return items.map((item) => {
+    const label = item.label.trim()
     const isCurrent = Boolean(
       currentHref &&
         (currentHref === item.href || currentHref.endsWith(item.href)),
@@ -37,9 +38,10 @@ function TocEntries({
           className={isCurrent ? 'toc-item is-current' : 'toc-item'}
           type="button"
           style={{ paddingInlineStart: `${14 + depth * 16}px` }}
+          title={label}
           onClick={() => onSelect(item.href)}
         >
-          {item.label.trim()}
+          {label}
         </button>
         {item.subitems?.length ? (
           <ul>
