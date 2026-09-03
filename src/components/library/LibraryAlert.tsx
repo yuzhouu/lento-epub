@@ -1,4 +1,14 @@
+import { useEffect, useEffectEvent } from 'react'
 import { X } from 'lucide-react'
+
+export const LIBRARY_ALERT_DURATION_MS = 8000
+
+export function scheduleLibraryAlertDismiss(
+  onDismiss: () => void,
+): () => void {
+  const timeout = setTimeout(onDismiss, LIBRARY_ALERT_DURATION_MS)
+  return () => clearTimeout(timeout)
+}
 
 export interface LibraryAlertNotice {
   kind: 'success' | 'error'
@@ -17,6 +27,13 @@ export function LibraryAlert({
   dismissLabel,
   onDismiss,
 }: LibraryAlertProps) {
+  const dismiss = useEffectEvent(onDismiss)
+
+  useEffect(
+    () => scheduleLibraryAlertDismiss(dismiss),
+    [notice],
+  )
+
   return (
     <div
       className={`library-toast${notice.kind === 'error' ? ' is-error' : ''}`}
