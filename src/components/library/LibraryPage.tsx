@@ -214,6 +214,15 @@ export function LibraryPage({
         )}
       </section>
 
+      <footer className="library-footer">
+        <span className="library-footer-brand">卷舍 · Lento</span>
+        <nav aria-label="产品信息">
+          <span>© yuzhou</span>
+          <span className="library-footer-separator" aria-hidden="true">·</span>
+          <a href="#/about">关于</a>
+        </nav>
+      </footer>
+
       {drop.isDraggingFiles ? (
         <div className="drop-import-overlay" aria-hidden="true">
           <Files size={38} strokeWidth={1.35} />

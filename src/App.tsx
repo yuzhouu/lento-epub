@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
 } from 'react'
+import { AboutPage } from './components/about/AboutPage'
 import { LibraryPage } from './components/library/LibraryPage'
 import { useBookImport } from './components/library/ImportBookButton'
 import type { LibraryAlertNotice } from './components/library/LibraryAlert'
@@ -25,14 +26,23 @@ const ReaderPage = lazy(() =>
   })),
 )
 
-function getBookIdFromHash(): string | undefined {
+type AppRoute =
+  | { page: 'library' }
+  | { page: 'about' }
+  | { page: 'reader'; bookId: string }
+
+function getRouteFromHash(): AppRoute {
+  if (window.location.hash === '#/about') return { page: 'about' }
+
   const match = window.location.hash.match(/^#\/book\/(.+)$/)
-  return match ? decodeURIComponent(match[1]) : undefined
+  return match
+    ? { page: 'reader', bookId: decodeURIComponent(match[1]) }
+    : { page: 'library' }
 }
 
 export function App() {
   const [books, setBooks] = useState<BookRecord[]>([])
-  const [activeBookId, setActiveBookId] = useState(getBookIdFromHash)
+  const [route, setRoute] = useState<AppRoute>(getRouteFromHash)
   const [isLoading, setIsLoading] = useState(true)
   const [libraryNotice, setLibraryNotice] = useState<LibraryAlertNotice>()
 
@@ -61,10 +71,15 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    const handleHashChange = () => setActiveBookId(getBookIdFromHash())
+    const handleHashChange = () => setRoute(getRouteFromHash())
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
+
+  useEffect(() => {
+    document.title =
+      route.page === 'about' ? '关于 · 卷舍 Lento' : '卷舍 · Lento'
+  }, [route.page])
 
   useEffect(() => {
     if (__LENTO_BUILD_TARGET__ !== 'web' || isLoading) return
@@ -79,6 +94,7 @@ export function App() {
     })
   }, [handleBack, importer.importFiles, isLoading])
 
+  const activeBookId = route.page === 'reader' ? route.bookId : undefined
   const activeBook = useMemo(
     () => books.find((book) => book.id === activeBookId),
     [activeBookId, books],
@@ -124,6 +140,10 @@ export function App() {
         <span>卷舍 · Lento</span>
       </main>
     )
+  }
+
+  if (route.page === 'about') {
+    return <AboutPage />
   }
 
   if (activeBookId && activeBook) {
