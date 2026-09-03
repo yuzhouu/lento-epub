@@ -42,6 +42,7 @@ export interface EpubImportFailure {
 
 export interface EpubImportDuplicate {
   fileName: string
+  existingBookId: string
   existingTitle: string
 }
 
@@ -133,6 +134,7 @@ export async function importEpubFiles(
     imported: saved.imported,
     duplicates: saved.duplicates.map(({ book, existingBook }) => ({
       fileName: book.fileName,
+      existingBookId: existingBook.id,
       existingTitle: existingBook.title,
     })),
     failures,

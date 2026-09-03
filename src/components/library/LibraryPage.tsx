@@ -7,7 +7,7 @@ import {
 import { BookRow } from './BookRow'
 import { BookDetailsSidebar } from './BookDetailsSidebar'
 import { DeleteBookDialog } from './DeleteBookDialog'
-import { ImportBookButton, useBookImport } from './ImportBookButton'
+import { ImportBookButton } from './ImportBookButton'
 import { InstallAppButton } from './InstallAppButton'
 import {
   LibraryAlert,
@@ -28,7 +28,10 @@ import { useDeleteUndo } from '../../features/library/hooks/useDeleteUndo'
 
 interface LibraryPageProps {
   books: BookRecord[]
-  onImported: (books: BookRecord[]) => void
+  libraryNotice: LibraryAlertNotice | undefined
+  isImporting: boolean
+  onImportFiles: (files: File[]) => Promise<void>
+  onLibraryNoticeChange: (notice: LibraryAlertNotice | undefined) => void
   onRestored: (books: BookRecord[]) => void
   onDelete: (id: string) => Promise<DeletedBookEntry | undefined>
   onUndoDelete: (entry: DeletedBookEntry) => Promise<void>
@@ -38,23 +41,24 @@ interface LibraryPageProps {
 
 export function LibraryPage({
   books,
-  onImported,
+  libraryNotice,
+  isImporting,
+  onImportFiles,
+  onLibraryNoticeChange,
   onRestored,
   onDelete,
   onUndoDelete,
   onUpdateBook,
   onOpen,
 }: LibraryPageProps) {
-  const [libraryNotice, setLibraryNotice] = useState<LibraryAlertNotice>()
   const [managedBookId, setManagedBookId] = useState<string>()
-  const importer = useBookImport(onImported, setLibraryNotice)
-  const drop = useEpubDrop(importer.importFiles)
+  const drop = useEpubDrop(onImportFiles)
   const query = useLibraryQuery(books)
   const storageInfo = useLibraryStorage(books)
   const deletion = useDeleteUndo({
     onDelete,
     onUndoDelete,
-    onNotice: setLibraryNotice,
+    onNotice: onLibraryNoticeChange,
     onDeleted: (bookId) => {
       if (bookId === managedBookId) setManagedBookId(undefined)
     },
@@ -64,11 +68,11 @@ export function LibraryPage({
     id: string,
     patch: BookOrganizationPatch,
   ): Promise<void> {
-    setLibraryNotice(undefined)
+    onLibraryNoticeChange(undefined)
     try {
       await onUpdateBook(id, patch)
     } catch (updateError) {
-      setLibraryNotice({
+      onLibraryNoticeChange({
         kind: 'error',
         message:
           updateError instanceof Error
@@ -103,11 +107,11 @@ export function LibraryPage({
           <LibraryBackupActions
             hasBooks={books.length > 0}
             onRestored={onRestored}
-            onAlert={setLibraryNotice}
+            onAlert={onLibraryNoticeChange}
           />
           <ImportBookButton
-            isImporting={importer.isImporting}
-            onFilesSelected={(files) => void importer.importFiles(files)}
+            isImporting={isImporting}
+            onFilesSelected={(files) => void onImportFiles(files)}
           />
         </div>
       </header>
@@ -203,8 +207,8 @@ export function LibraryPage({
             <p>选择或拖入 EPUB 文件，从一册书开始。</p>
             <ImportBookButton
               compact
-              isImporting={importer.isImporting}
-              onFilesSelected={(files) => void importer.importFiles(files)}
+              isImporting={isImporting}
+              onFilesSelected={(files) => void onImportFiles(files)}
             />
           </div>
         )}
@@ -233,7 +237,7 @@ export function LibraryPage({
             <LibraryAlert
               notice={libraryNotice}
               dismissLabel="关闭提示"
-              onDismiss={() => setLibraryNotice(undefined)}
+              onDismiss={() => onLibraryNoticeChange(undefined)}
             />
           ) : null}
           {deletion.deletedEntry ? (

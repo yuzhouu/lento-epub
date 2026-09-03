@@ -9,6 +9,23 @@
   "display": "standalone",
   "background_color": "#f5f2eb",
   "theme_color": "#f5f2eb",
+  "file_handlers": [
+    {
+      "action": ".",
+      "name": "EPUB 电子书",
+      "accept": {
+        "application/epub+zip": [".epub"]
+      },
+      "icons": [
+        {
+          "src": "icons/lento-128.png",
+          "sizes": "128x128",
+          "type": "image/png"
+        }
+      ],
+      "launch_type": "single-client"
+    }
+  ],
   "icons": [
     {
       "src": "icons/lento.svg",

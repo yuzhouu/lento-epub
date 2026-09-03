@@ -6,8 +6,12 @@ import type { BookRecord } from '../../types/book'
 import type { EpubImportResult } from '../../lib/import-epub'
 
 interface UseBookImportResult {
-  importFiles: (files: File[]) => Promise<void>
+  importFiles: (files: File[], options?: BookImportOptions) => Promise<void>
   isImporting: boolean
+}
+
+export interface BookImportOptions {
+  openSingle?: boolean
 }
 
 function describeImportResult(result: EpubImportResult): LibraryAlertNotice {
@@ -40,37 +44,51 @@ function describeImportResult(result: EpubImportResult): LibraryAlertNotice {
 export function useBookImport(
   onImported: (books: BookRecord[]) => void,
   onAlert: (notice: LibraryAlertNotice | undefined) => void,
+  onOpen: (id: string) => void,
 ): UseBookImportResult {
-  const importingRef = useRef(false)
+  const importQueueRef = useRef(Promise.resolve())
+  const pendingImportCountRef = useRef(0)
   const [isImporting, setIsImporting] = useState(false)
 
   const importFiles = useCallback(
-    async (files: File[]) => {
-      if (files.length === 0 || importingRef.current) return
+    (files: File[], options?: BookImportOptions) => {
+      if (files.length === 0) return Promise.resolve()
 
-      importingRef.current = true
+      pendingImportCountRef.current += 1
       setIsImporting(true)
-      onAlert(undefined)
-      try {
-        const { importEpubFiles } = await import('../../lib/import-epub')
-        const result = await importEpubFiles(files)
-        if (result.imported.length > 0) onImported(result.imported)
-        onAlert(describeImportResult(result))
-      } catch (importError) {
-        onAlert({
-          kind: 'error',
-          message:
-            getStorageErrorMessage(importError) ??
-            (importError instanceof Error
-              ? importError.message
-              : '添加书本失败。'),
-        })
-      } finally {
-        importingRef.current = false
-        setIsImporting(false)
+      const runImport = async () => {
+        onAlert(undefined)
+        try {
+          const { importEpubFiles } = await import('../../lib/import-epub')
+          const result = await importEpubFiles(files)
+          if (result.imported.length > 0) onImported(result.imported)
+          onAlert(describeImportResult(result))
+
+          if (options?.openSingle && files.length === 1) {
+            const bookId =
+              result.imported[0]?.id ?? result.duplicates[0]?.existingBookId
+            if (bookId) onOpen(bookId)
+          }
+        } catch (importError) {
+          onAlert({
+            kind: 'error',
+            message:
+              getStorageErrorMessage(importError) ??
+              (importError instanceof Error
+                ? importError.message
+                : '添加书本失败。'),
+          })
+        } finally {
+          pendingImportCountRef.current -= 1
+          if (pendingImportCountRef.current === 0) setIsImporting(false)
+        }
       }
+
+      const queuedImport = importQueueRef.current.then(runImport)
+      importQueueRef.current = queuedImport.catch(() => undefined)
+      return queuedImport
     },
-    [onAlert, onImported],
+    [onAlert, onImported, onOpen],
   )
 
   return {

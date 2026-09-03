@@ -1,5 +1,14 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { LibraryPage } from './components/library/LibraryPage'
+import { useBookImport } from './components/library/ImportBookButton'
+import type { LibraryAlertNotice } from './components/library/LibraryAlert'
 import {
   deleteBook,
   getBooks,
@@ -7,6 +16,7 @@ import {
   updateBookOrganization,
   type BookOrganizationPatch,
 } from './data/indexed-db/book-repository'
+import { subscribeToEpubFileLaunch } from './features/library/model/epub-file-launch'
 import type { BookRecord, DeletedBookEntry } from './types/book'
 
 const ReaderPage = lazy(() =>
@@ -24,6 +34,25 @@ export function App() {
   const [books, setBooks] = useState<BookRecord[]>([])
   const [activeBookId, setActiveBookId] = useState(getBookIdFromHash)
   const [isLoading, setIsLoading] = useState(true)
+  const [libraryNotice, setLibraryNotice] = useState<LibraryAlertNotice>()
+
+  const handleImported = useCallback((importedBooks: BookRecord[]) => {
+    setBooks((current) => [...importedBooks, ...current])
+  }, [])
+
+  const handleOpen = useCallback((id: string) => {
+    window.location.hash = `/book/${encodeURIComponent(id)}`
+  }, [])
+
+  const handleBack = useCallback(() => {
+    window.location.hash = '/'
+  }, [])
+
+  const importer = useBookImport(
+    handleImported,
+    setLibraryNotice,
+    handleOpen,
+  )
 
   useEffect(() => {
     void getBooks()
@@ -37,14 +66,23 @@ export function App() {
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
 
+  useEffect(() => {
+    if (__LENTO_BUILD_TARGET__ !== 'web' || isLoading) return
+
+    return subscribeToEpubFileLaunch((event) => {
+      handleBack()
+      if (event.kind === 'error') {
+        setLibraryNotice({ kind: 'error', message: event.message })
+        return
+      }
+      void importer.importFiles(event.files, { openSingle: true })
+    })
+  }, [handleBack, importer.importFiles, isLoading])
+
   const activeBook = useMemo(
     () => books.find((book) => book.id === activeBookId),
     [activeBookId, books],
   )
-
-  function handleImported(importedBooks: BookRecord[]) {
-    setBooks((current) => [...importedBooks, ...current])
-  }
 
   function handleRestored(restoredBooks: BookRecord[]) {
     setBooks(restoredBooks)
@@ -80,14 +118,6 @@ export function App() {
     setBooks(await getBooks())
   }
 
-  function handleOpen(id: string) {
-    window.location.hash = `/book/${encodeURIComponent(id)}`
-  }
-
-  function handleBack() {
-    window.location.hash = '/'
-  }
-
   if (isLoading) {
     return (
       <main className="loading-screen">
@@ -117,7 +147,10 @@ export function App() {
   return (
     <LibraryPage
       books={books}
-      onImported={handleImported}
+      libraryNotice={libraryNotice}
+      isImporting={importer.isImporting}
+      onImportFiles={importer.importFiles}
+      onLibraryNoticeChange={setLibraryNotice}
       onRestored={handleRestored}
       onDelete={handleDelete}
       onUndoDelete={handleUndoDelete}
