@@ -46,6 +46,16 @@ LENTO_BASE_PATH=/lento/ npm run build:web
 
 在 `chrome://extensions` 开启“开发者模式”，选择“加载已解压的扩展程序”，加载项目中的 `dist/extension` 目录。点击工具栏中的卷舍图标即可打开阅读器。
 
+### 发布 Chrome 扩展
+
+```bash
+npm run release:extension
+```
+
+命令会依次运行测试、类型检查、扩展构建与商店素材校验，并生成可直接上传的 `release/chrome-web-store/lento-epub-reader-<version>.zip`。ZIP 根目录包含 `manifest.json`。
+
+可直接粘贴到 Developer Dashboard 的商店文案、隐私披露、审核说明和素材清单见 [`store/README.md`](store/README.md)。公开隐私政策同时提供为应用内 `#/privacy` 页面和 [`PRIVACY.md`](PRIVACY.md)。
+
 ## 当前能力
 
 - 批量选择或拖放导入本地 `.epub` 文件，并检测内容重复的书籍

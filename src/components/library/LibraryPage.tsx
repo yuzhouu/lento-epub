@@ -220,6 +220,8 @@ export function LibraryPage({
           <span>© yuzhou</span>
           <span className="library-footer-separator" aria-hidden="true">·</span>
           <a href="#/about">关于</a>
+          <span className="library-footer-separator" aria-hidden="true">·</span>
+          <a href="#/privacy">隐私政策</a>
         </nav>
       </footer>
 

@@ -10,6 +10,8 @@
     "build": "npm run typecheck && npm run build:web && npm run build:extension",
     "build:web": "vite build --mode web",
     "build:extension": "vite build --mode extension",
+    "check:store": "node scripts/check-store-assets.mjs",
+    "release:extension": "npm run test && npm run typecheck && npm run build:extension && npm run check:store && node scripts/package-extension.mjs",
     "preview": "vite preview --mode web --host 127.0.0.1 --port 4178"
   },
   "dependencies": {

@@ -17,6 +17,7 @@
 .about-back-link,
 .about-brand,
 .about-feedback-link,
+.about-privacy-link,
 .about-footer a {
   color: inherit;
   text-decoration: none;
@@ -46,6 +47,7 @@
 .about-back-link:focus-visible,
 .about-brand:focus-visible,
 .about-feedback-link:focus-visible,
+.about-privacy-link:focus-visible,
 .about-footer a:focus-visible {
   outline: 2px solid var(--green);
   outline-offset: 4px;
@@ -189,12 +191,26 @@
   font-size: clamp(25px, 2.7vw, 34px);
 }
 
-.about-privacy div > p:last-child {
+.about-privacy div > p:not(.about-section-kicker) {
   max-width: 720px;
   margin: 17px 0 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.85;
+}
+
+.about-privacy-link {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--green-deep);
+  font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: rgba(49, 93, 75, 0.35);
+  text-underline-offset: 4px;
+}
+
+.about-privacy-link:hover {
+  text-decoration-color: currentColor;
 }
 
 .about-feedback {
@@ -281,6 +297,13 @@
 }
 
 .about-footer > span {
+  letter-spacing: 0.035em;
+}
+
+.about-footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   letter-spacing: 0.035em;
 }
 
@@ -375,6 +398,7 @@
 @media (prefers-reduced-motion: reduce) {
   .about-back-link,
   .about-feedback-link,
+  .about-privacy-link,
   .about-footer a {
     transition: none;
   }

@@ -93,6 +93,9 @@ export function AboutPage() {
               导入的书籍、阅读进度、书签和批注只保存在当前浏览器，不会上传到远程服务。
               网站、Chrome 扩展和不同域名的书库彼此独立，需要迁移时可使用书库备份。
             </p>
+            <a className="about-privacy-link" href="#/privacy">
+              查看完整隐私政策
+            </a>
           </div>
         </section>
 
@@ -130,7 +133,11 @@ export function AboutPage() {
         <a className="about-footer-brand" href="#/">
           卷舍 · Lento
         </a>
-        <span>© yuzhou</span>
+        <div className="about-footer-meta">
+          <span>© yuzhou</span>
+          <span aria-hidden="true">·</span>
+          <a href="#/privacy">隐私政策</a>
+        </div>
       </footer>
     </main>
   )

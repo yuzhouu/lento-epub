@@ -10,6 +10,7 @@ import { AboutPage } from './components/about/AboutPage'
 import { LibraryPage } from './components/library/LibraryPage'
 import { useBookImport } from './components/library/ImportBookButton'
 import type { LibraryAlertNotice } from './components/library/LibraryAlert'
+import { PrivacyPage } from './components/privacy/PrivacyPage'
 import {
   deleteBook,
   getBooks,
@@ -29,10 +30,12 @@ const ReaderPage = lazy(() =>
 type AppRoute =
   | { page: 'library' }
   | { page: 'about' }
+  | { page: 'privacy' }
   | { page: 'reader'; bookId: string }
 
 function getRouteFromHash(): AppRoute {
   if (window.location.hash === '#/about') return { page: 'about' }
+  if (window.location.hash === '#/privacy') return { page: 'privacy' }
 
   const match = window.location.hash.match(/^#\/book\/(.+)$/)
   return match
@@ -78,7 +81,11 @@ export function App() {
 
   useEffect(() => {
     document.title =
-      route.page === 'about' ? '关于 · 卷舍 Lento' : '卷舍 · Lento'
+      route.page === 'about'
+        ? '关于 · 卷舍 Lento'
+        : route.page === 'privacy'
+          ? '隐私政策 · 卷舍 Lento'
+          : '卷舍 · Lento'
   }, [route.page])
 
   useEffect(() => {
@@ -144,6 +151,10 @@ export function App() {
 
   if (route.page === 'about') {
     return <AboutPage />
+  }
+
+  if (route.page === 'privacy') {
+    return <PrivacyPage />
   }
 
   if (activeBookId && activeBook) {

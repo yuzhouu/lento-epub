@@ -4,6 +4,7 @@ import { App } from './App'
 import { initializeEpubFileHandling } from './features/library/model/epub-file-launch'
 import './styles/base.css'
 import './styles/about.css'
+import './styles/privacy.css'
 import './styles/library.css'
 import './styles/reader.css'
 
