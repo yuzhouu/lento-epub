@@ -2263,6 +2263,49 @@
   padding-inline: 0;
 }
 
+.reader-stage.is-chapter-flow .epub-container {
+  scrollbar-width: none !important;
+}
+
+.reader-stage.is-chapter-flow .epub-container::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.chapter-scrollbar {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  overscroll-behavior-y: contain;
+  background: transparent;
+  scrollbar-color: rgba(35, 49, 43, 0.32) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.chapter-scrollbar:focus-visible {
+  outline: 2px solid var(--reader-accent, #315d4b);
+  outline-offset: -2px;
+}
+
+.chapter-scrollbar-spacer {
+  width: 1px;
+  pointer-events: none;
+}
+
+.reader-stage[aria-busy='true'] .chapter-scrollbar {
+  visibility: hidden;
+}
+
+.theme-night .chapter-scrollbar {
+  scrollbar-color: rgba(230, 225, 213, 0.34) transparent;
+}
+
 .epub-viewer {
   width: min(var(--reader-column-width, 760px), 100%);
   height: 100%;

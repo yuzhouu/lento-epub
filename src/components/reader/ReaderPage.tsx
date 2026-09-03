@@ -157,12 +157,16 @@ export function ReaderPage({
     currentHref,
     chapterLabel,
     chapterProgress,
+    chapterScrollSize,
+    chapterViewportSize,
     atChapterStart,
     atChapterEnd,
     isOpening,
     openingMessage,
     error,
     resetChapterBoundary,
+    displayChapter: displayReaderChapter,
+    scrollChapterToProgress,
   } = reader
 
   useEffect(() => {
@@ -672,8 +676,7 @@ export function ReaderPage({
 
   function displayChapter(href: string) {
     dismissPendingSelection()
-    resetChapterBoundary()
-    void renditionRef.current?.display(href)
+    displayReaderChapter(href)
     if (window.innerWidth < 980) setTocOpen(false)
   }
 
@@ -801,11 +804,15 @@ export function ReaderPage({
             openingMessage={openingMessage}
             error={error}
             viewerRef={viewerRef}
+            chapterProgress={chapterProgress}
+            chapterScrollSize={chapterScrollSize}
+            chapterViewportSize={chapterViewportSize}
             onBack={onBack}
             onPageTurn={(direction) => {
               if (direction === 'previous') handleBackward()
               else handleForward()
             }}
+            onChapterScroll={scrollChapterToProgress}
             selectionEditor={
               pendingSelection ? (
                 <SelectionEditor

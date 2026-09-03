@@ -4,15 +4,97 @@ export interface ChapterScrollProgress {
   progress: number
   atStart: boolean
   atEnd: boolean
+  scrollSize: number
+  viewportSize: number
+}
+
+export interface ChapterScrollRange {
+  start: number
+  end: number
+}
+
+interface RenderedView {
+  document: Document
+  element: HTMLElement
+}
+
+interface ContentScrollBridgeOptions {
+  getChapterRange?: (view: RenderedView) => ChapterScrollRange | undefined
+}
+
+interface ActiveScrollRange {
+  range: ChapterScrollRange
+  constrained: boolean
+}
+
+export function getChapterScrollState(
+  scrollTop: number,
+  viewportHeight: number,
+  range: ChapterScrollRange,
+): ChapterScrollProgress & { scrollTop: number } {
+  const rangeStart = Math.max(0, range.start)
+  const rangeEnd = Math.max(rangeStart, range.end)
+  const scrollSize = rangeEnd - rangeStart
+  const viewportSize = Math.max(0, viewportHeight)
+  const readableDistance = Math.max(
+    0,
+    scrollSize - viewportSize,
+  )
+  const nextScrollTop = Math.max(
+    rangeStart,
+    Math.min(rangeStart + readableDistance, scrollTop),
+  )
+  if (readableDistance === 0) {
+    return {
+      scrollTop: nextScrollTop,
+      progress: 1,
+      atStart: true,
+      atEnd: true,
+      scrollSize,
+      viewportSize,
+    }
+  }
+
+  const chapterOffset = nextScrollTop - rangeStart
+  return {
+    scrollTop: nextScrollTop,
+    progress: chapterOffset / readableDistance,
+    atStart: chapterOffset <= 1,
+    atEnd: chapterOffset >= readableDistance - 1,
+    scrollSize,
+    viewportSize,
+  }
+}
+
+export function getChapterScrollTopForProgress(
+  progress: number,
+  viewportHeight: number,
+  range: ChapterScrollRange,
+): number {
+  const rangeStart = Math.max(0, range.start)
+  const rangeEnd = Math.max(rangeStart, range.end)
+  const normalizedProgress = Math.max(0, Math.min(1, progress))
+  const readableDistance = Math.max(
+    0,
+    rangeEnd - rangeStart - Math.max(0, viewportHeight),
+  )
+  return rangeStart + normalizedProgress * readableDistance
+}
+
+export interface ContentScrollBridgeController {
+  update: () => void
+  scrollToProgress: (progress: number) => void
+  cleanup: () => void
 }
 
 export function attachContentScrollBridge(
   rendition: EpubRendition,
   viewerElement: HTMLElement,
   onProgress: (progress: ChapterScrollProgress) => void,
-): { update: () => void; cleanup: () => void } {
+  options: ContentScrollBridgeOptions = {},
+): ContentScrollBridgeController {
   const contentDocuments = new Set<Document>()
-  const renderedViews = new Set<HTMLElement>()
+  const renderedViews = new Map<HTMLElement, RenderedView>()
   const documentCleanups = new Map<Document, () => void>()
   let lastTouchY: number | undefined
   let scrollContainer: HTMLElement | undefined
@@ -22,12 +104,55 @@ export function attachContentScrollBridge(
     return viewerElement.querySelector<HTMLElement>('.epub-container')
   }
 
+  function getActiveView(container: HTMLElement): RenderedView | undefined {
+    const views = [...renderedViews.values()]
+      .filter((view) => view.element.isConnected)
+      .sort((a, b) => a.element.offsetTop - b.element.offsetTop)
+    return (
+      views.find(
+        (view) =>
+          container.scrollTop <
+          view.element.offsetTop + view.element.offsetHeight,
+      ) ?? views.at(-1)
+    )
+  }
+
+  function getActiveRange(container: HTMLElement): ActiveScrollRange | undefined {
+    const activeView = getActiveView(container)
+    if (!activeView) return undefined
+    const chapterRange = options.getChapterRange?.(activeView)
+    return {
+      range: chapterRange ?? {
+        start: activeView.element.offsetTop,
+        end: activeView.element.offsetTop + activeView.element.offsetHeight,
+      },
+      constrained: Boolean(chapterRange),
+    }
+  }
+
   function scrollBy(deltaY: number, event: Event) {
     const container = getScrollContainer()
     if (!container) return
     const previousScrollTop = container.scrollTop
-    container.scrollTop += deltaY
-    if (container.scrollTop !== previousScrollTop) event.preventDefault()
+    const activeRange = getActiveRange(container)
+    if (!activeRange) return
+    if (!activeRange.constrained) {
+      container.scrollTop += deltaY
+      if (container.scrollTop !== previousScrollTop) event.preventDefault()
+      return
+    }
+    const nextState = getChapterScrollState(
+      previousScrollTop + deltaY,
+      container.clientHeight,
+      activeRange.range,
+    )
+    container.scrollTop = nextState.scrollTop
+    if (
+      container.scrollTop !== previousScrollTop ||
+      nextState.scrollTop !== previousScrollTop + deltaY
+    ) {
+      event.preventDefault()
+    }
   }
 
   function update() {
@@ -35,42 +160,49 @@ export function attachContentScrollBridge(
     progressFrame = requestAnimationFrame(() => {
       const container = getScrollContainer()
       if (!container) return
-
-      const views = [...renderedViews]
-        .filter((element) => element.isConnected)
-        .sort((a, b) => a.offsetTop - b.offsetTop)
-      const activeView =
-        views.find(
-          (element) =>
-            container.scrollTop < element.offsetTop + element.offsetHeight,
-        ) ?? views.at(-1)
-      if (!activeView) {
-        onProgress({ progress: 0, atStart: false, atEnd: false })
+      const activeRange = getActiveRange(container)
+      if (!activeRange) {
+        onProgress({
+          progress: 0,
+          atStart: false,
+          atEnd: false,
+          scrollSize: 0,
+          viewportSize: container.clientHeight,
+        })
         return
       }
-
-      const readableDistance = Math.max(
-        0,
-        activeView.offsetHeight - container.clientHeight,
+      const nextState = getChapterScrollState(
+        container.scrollTop,
+        container.clientHeight,
+        activeRange.range,
       )
-      if (readableDistance === 0) {
-        onProgress({ progress: 1, atStart: true, atEnd: true })
-        return
+      if (
+        activeRange.constrained &&
+        container.scrollTop !== nextState.scrollTop
+      ) {
+        container.scrollTop = nextState.scrollTop
       }
-
-      const chapterOffset = Math.max(
-        0,
-        Math.min(
-          readableDistance,
-          container.scrollTop - activeView.offsetTop,
-        ),
-      )
       onProgress({
-        progress: chapterOffset / readableDistance,
-        atStart: chapterOffset <= 1,
-        atEnd: chapterOffset >= readableDistance - 1,
+        progress: nextState.progress,
+        atStart: nextState.atStart,
+        atEnd: nextState.atEnd,
+        scrollSize: nextState.scrollSize,
+        viewportSize: nextState.viewportSize,
       })
     })
+  }
+
+  function scrollToProgress(progress: number) {
+    const container = getScrollContainer()
+    if (!container) return
+    const activeRange = getActiveRange(container)
+    if (!activeRange) return
+    container.scrollTop = getChapterScrollTopForProgress(
+      progress,
+      container.clientHeight,
+      activeRange.range,
+    )
+    update()
   }
 
   function attach(
@@ -80,7 +212,18 @@ export function attachContentScrollBridge(
     const contentDocument = view.document
     if (!contentDocument || contentDocuments.has(contentDocument)) return
     contentDocuments.add(contentDocument)
-    if (view.element) renderedViews.add(view.element)
+    if (view.element) {
+      renderedViews.set(view.element, {
+        document: contentDocument,
+        element: view.element,
+      })
+    }
+
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? undefined
+        : new ResizeObserver(update)
+    if (view.element) resizeObserver?.observe(view.element)
 
     const container = getScrollContainer()
     if (container && container !== scrollContainer) {
@@ -132,12 +275,14 @@ export function attachContentScrollBridge(
       contentDocument.removeEventListener('touchmove', handleTouchMove)
       contentDocument.removeEventListener('touchend', clearTouch)
       contentDocument.removeEventListener('touchcancel', clearTouch)
+      resizeObserver?.disconnect()
     })
   }
 
   rendition.on('rendered', attach)
   return {
     update,
+    scrollToProgress,
     cleanup: () => {
       rendition.off('rendered', attach)
       scrollContainer?.removeEventListener('scroll', update)

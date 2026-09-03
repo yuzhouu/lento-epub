@@ -10,10 +10,17 @@ import type {
 } from '../../../types/book'
 import { attachReadingHighlightHover, renderReadingHighlight } from '../epub/epub-annotations'
 import { EpubReaderRuntime } from '../epub/EpubReaderRuntime'
-import { attachContentScrollBridge } from '../epub/epub-input-bridge'
 import {
-  findChapterLabel,
+  attachContentScrollBridge,
+  type ChapterScrollProgress,
+  type ContentScrollBridgeController,
+} from '../epub/epub-input-bridge'
+import {
+  findChapterAnchorRange,
+  findChapterAtOffset,
+  findChapterItem,
   getChapterProgress,
+  isSameChapterHref,
 } from '../epub/epub-navigation'
 import { registerReaderTheme } from '../epub/epub-theme'
 import type { EpubRendition } from '../epub/epub-types'
@@ -43,6 +50,14 @@ interface UseEpubReaderOptions {
   onPageTurn: (direction: 'previous' | 'next') => void
 }
 
+const EMPTY_CHAPTER_SCROLL: ChapterScrollProgress = {
+  progress: 0,
+  atStart: false,
+  atEnd: false,
+  scrollSize: 0,
+  viewportSize: 0,
+}
+
 function isEditableKeyboardTarget(target: EventTarget | null): boolean {
   if (
     !target ||
@@ -59,6 +74,23 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
   )
 }
 
+function findChapterAnchor(
+  contentDocument: Document,
+  fragment: string,
+): Element | undefined {
+  return (
+    contentDocument.getElementById(fragment) ??
+    contentDocument.getElementsByName(fragment)[0]
+  )
+}
+
+function getDocumentOffsetTop(element: Element): number {
+  return (
+    element.getBoundingClientRect().top +
+    (element.ownerDocument.defaultView?.scrollY ?? 0)
+  )
+}
+
 export function useEpubReader(options: UseEpubReaderOptions) {
   const { bookRecord, preferences } = options
   const callbacksRef = useRef(options)
@@ -67,15 +99,24 @@ export function useEpubReader(options: UseEpubReaderOptions) {
   preferencesRef.current = preferences
   const viewerRef = useRef<HTMLDivElement>(null)
   const renditionRef = useRef<EpubRendition | null>(null)
+  const scrollBridgeRef = useRef<ContentScrollBridgeController | null>(null)
   const currentLocationRef = useRef(bookRecord.location)
   const currentBookIdRef = useRef(bookRecord.id)
   const tocRef = useRef<TocItem[]>([])
+  const currentChapterHrefRef = useRef<string | undefined>(undefined)
+  const currentChapterLabelRef = useRef(bookRecord.chapterLabel)
   const [toc, setToc] = useState<TocItem[]>([])
   const [currentHref, setCurrentHref] = useState<string>()
   const [chapterLabel, setChapterLabel] = useState(bookRecord.chapterLabel)
-  const [chapterProgress, setChapterProgress] = useState(0)
-  const [atChapterStart, setAtChapterStart] = useState(false)
-  const [atChapterEnd, setAtChapterEnd] = useState(false)
+  const [chapterScroll, setChapterScroll] =
+    useState<ChapterScrollProgress>(EMPTY_CHAPTER_SCROLL)
+  const {
+    progress: chapterProgress,
+    atStart: atChapterStart,
+    atEnd: atChapterEnd,
+    scrollSize: chapterScrollSize,
+    viewportSize: chapterViewportSize,
+  } = chapterScroll
   const [isOpening, setIsOpening] = useState(true)
   const [openingMessage, setOpeningMessage] = useState('正在读取书籍…')
   const [error, setError] = useState<string>()
@@ -105,12 +146,12 @@ export function useEpubReader(options: UseEpubReaderOptions) {
       currentBookIdRef.current = bookRecord.id
       currentLocationRef.current = bookRecord.location
       tocRef.current = []
+      currentChapterHrefRef.current = undefined
+      currentChapterLabelRef.current = bookRecord.chapterLabel
       setToc([])
       setCurrentHref(undefined)
       setChapterLabel(bookRecord.chapterLabel)
-      setChapterProgress(0)
-      setAtChapterStart(false)
-      setAtChapterEnd(false)
+      setChapterScroll(EMPTY_CHAPTER_SCROLL)
     }
     setError(undefined)
     setIsOpening(true)
@@ -124,8 +165,6 @@ export function useEpubReader(options: UseEpubReaderOptions) {
     let removeRelocationListener: (() => void) | undefined
     let removeSelectionListener: (() => void) | undefined
     let updateScrolledChapterProgress: (() => void) | undefined
-    let currentChapterLabel = bookRecord.chapterLabel
-    let currentChapterHref: string | undefined
     let persistTimer: ReturnType<typeof setTimeout> | undefined
     let pendingReadingState:
       | Pick<BookRecord, 'progress' | 'location' | 'chapterLabel'>
@@ -200,14 +239,15 @@ export function useEpubReader(options: UseEpubReaderOptions) {
             cfi,
             text,
             contentWindow,
-            href: currentChapterHref,
-            chapterLabel: currentChapterLabel,
+            href: currentChapterHrefRef.current,
+            chapterLabel: currentChapterLabelRef.current,
           })
         }
         rendition.on('selected', handleTextSelected)
         removeSelectionListener = () => rendition.off('selected', handleTextSelected)
 
         const contentDocuments = new Set<Document>()
+        const renderedContentViews = new Map<Document, HTMLElement>()
         const highlightHoverCleanups = new Map<Document, () => void>()
         const handleContentPointerDown = () => {
           callbacksRef.current.onContentPointerDown()
@@ -252,11 +292,14 @@ export function useEpubReader(options: UseEpubReaderOptions) {
 
         function attachContentDocumentEvents(
           _section: unknown,
-          view: { document?: Document },
+          view: { document?: Document; element?: HTMLElement },
         ) {
           const contentDocument = view.document
           if (!contentDocument || contentDocuments.has(contentDocument)) return
           contentDocuments.add(contentDocument)
+          if (view.element) {
+            renderedContentViews.set(contentDocument, view.element)
+          }
           highlightHoverCleanups.set(
             contentDocument,
             attachReadingHighlightHover(contentDocument),
@@ -283,18 +326,51 @@ export function useEpubReader(options: UseEpubReaderOptions) {
           }
           highlightHoverCleanups.clear()
           contentDocuments.clear()
+          renderedContentViews.clear()
         }
 
         if (preferencesRef.current.flow !== 'paginated') {
           const scrollBridge = attachContentScrollBridge(
             rendition,
             viewerElement,
-            ({ progress, atStart, atEnd }) => {
-              setChapterProgress(progress)
-              setAtChapterStart(atStart)
-              setAtChapterEnd(atEnd)
-            },
+            setChapterScroll,
+            preferencesRef.current.flow === 'chapter'
+              ? {
+                  getChapterRange: ({ document, element }) => {
+                    const chapterHref = currentChapterHrefRef.current
+                    if (!chapterHref) return undefined
+                    const { startFragment, endFragment } =
+                      findChapterAnchorRange(tocRef.current, chapterHref)
+                    if (!startFragment && !endFragment) return undefined
+
+                    const startAnchor = startFragment
+                      ? findChapterAnchor(document, startFragment)
+                      : undefined
+                    const endAnchor = endFragment
+                      ? findChapterAnchor(document, endFragment)
+                      : undefined
+                    if (
+                      (startFragment && !startAnchor) ||
+                      (endFragment && !endAnchor)
+                    ) {
+                      return undefined
+                    }
+
+                    return {
+                      start:
+                        element.offsetTop +
+                        (startAnchor ? getDocumentOffsetTop(startAnchor) : 0),
+                      end:
+                        element.offsetTop +
+                        (endAnchor
+                          ? getDocumentOffsetTop(endAnchor)
+                          : element.offsetHeight),
+                    }
+                  },
+                }
+              : undefined,
           )
+          scrollBridgeRef.current = scrollBridge
           updateScrolledChapterProgress = scrollBridge.update
           removeContentScrollBridge = scrollBridge.cleanup
         }
@@ -315,27 +391,72 @@ export function useEpubReader(options: UseEpubReaderOptions) {
                 ),
               )
             : bookRecord.progress
-          const nextChapter = findChapterLabel(
-            tocRef.current,
-            location.start.href,
+          const currentChapterHref = currentChapterHrefRef.current
+          const staysInCurrentResource = Boolean(
+            currentChapterHref &&
+              isSameChapterHref(currentChapterHref, location.start.href),
           )
-          setCurrentHref(location.start.href)
-          currentChapterHref = location.start.href
+          const renderedChapter = !currentChapterHref
+            ? (() => {
+                const container = viewerElement.querySelector<HTMLElement>(
+                  '.epub-container',
+                )
+                const renderedView = [...renderedContentViews.entries()].find(
+                  ([, element]) =>
+                    element.isConnected &&
+                    container &&
+                    container.scrollTop <
+                      element.offsetTop + element.offsetHeight,
+                )
+                if (!container || !renderedView) return undefined
+                const [contentDocument, viewElement] = renderedView
+                return findChapterAtOffset(
+                  tocRef.current,
+                  location.start.href,
+                  container.scrollTop - viewElement.offsetTop,
+                  (fragment) => {
+                    const anchor = findChapterAnchor(contentDocument, fragment)
+                    return anchor ? getDocumentOffsetTop(anchor) : undefined
+                  },
+                )
+              })()
+            : undefined
+          const nextChapter =
+            renderedChapter ??
+            findChapterItem(
+              tocRef.current,
+              staysInCurrentResource && currentChapterHref
+                ? currentChapterHref
+                : location.start.href,
+              staysInCurrentResource
+                ? currentChapterLabelRef.current
+                : currentChapterHref
+                  ? undefined
+                  : bookRecord.chapterLabel,
+            )
+          const nextChapterHref = nextChapter?.href ?? location.start.href
+          const nextChapterLabel = nextChapter?.label.trim()
+          currentChapterHrefRef.current = nextChapterHref
+          currentChapterLabelRef.current = nextChapterLabel
+          setCurrentHref(nextChapterHref)
           if (preferencesRef.current.flow === 'paginated') {
             const nextChapterProgress = getChapterProgress(location)
-            setChapterProgress(nextChapterProgress)
-            setAtChapterStart(nextChapterProgress <= 0)
-            setAtChapterEnd(nextChapterProgress >= 1)
+            setChapterScroll({
+              progress: nextChapterProgress,
+              atStart: nextChapterProgress <= 0,
+              atEnd: nextChapterProgress >= 1,
+              scrollSize: 0,
+              viewportSize: 0,
+            })
           } else {
             updateScrolledChapterProgress?.()
           }
-          setChapterLabel(nextChapter)
-          currentChapterLabel = nextChapter
+          setChapterLabel(nextChapterLabel)
           currentLocationRef.current = location.start.cfi
           pendingReadingState = {
             location: location.start.cfi,
             progress: nextProgress,
-            chapterLabel: nextChapter,
+            chapterLabel: nextChapterLabel,
           }
           clearTimeout(persistTimer)
           persistTimer = setTimeout(persistReadingState, 350)
@@ -359,7 +480,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
                 0,
                 Math.min(1, book.locations.percentageFromCfi(currentLocation)),
               ),
-              chapterLabel: currentChapterLabel,
+              chapterLabel: currentChapterLabelRef.current,
             }
             clearTimeout(persistTimer)
             persistTimer = setTimeout(persistReadingState, 350)
@@ -388,6 +509,9 @@ export function useEpubReader(options: UseEpubReaderOptions) {
       removeContentDocumentEvents?.()
       removeRelocationListener?.()
       removeSelectionListener?.()
+      if (scrollBridgeRef.current?.cleanup === removeContentScrollBridge) {
+        scrollBridgeRef.current = null
+      }
       runtime?.destroy()
       if (renditionRef.current === runtime?.rendition) renditionRef.current = null
       viewer.replaceChildren()
@@ -475,9 +599,23 @@ export function useEpubReader(options: UseEpubReaderOptions) {
   }, [preferences.flow])
 
   function resetChapterBoundary() {
-    setChapterProgress(0)
-    setAtChapterStart(false)
-    setAtChapterEnd(false)
+    setChapterScroll(EMPTY_CHAPTER_SCROLL)
+  }
+
+  function scrollChapterToProgress(progress: number) {
+    scrollBridgeRef.current?.scrollToProgress(progress)
+  }
+
+  function displayChapter(href: string) {
+    const chapter = findChapterItem(tocRef.current, href)
+    const nextHref = chapter?.href ?? href
+    const nextLabel = chapter?.label.trim()
+    currentChapterHrefRef.current = nextHref
+    currentChapterLabelRef.current = nextLabel
+    setCurrentHref(nextHref)
+    setChapterLabel(nextLabel)
+    resetChapterBoundary()
+    void renditionRef.current?.display(href)
   }
 
   return {
@@ -488,11 +626,15 @@ export function useEpubReader(options: UseEpubReaderOptions) {
     currentHref,
     chapterLabel,
     chapterProgress,
+    chapterScrollSize,
+    chapterViewportSize,
     atChapterStart,
     atChapterEnd,
     isOpening,
     openingMessage,
     error,
     resetChapterBoundary,
+    displayChapter,
+    scrollChapterToProgress,
   }
 }
