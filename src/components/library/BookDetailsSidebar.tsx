@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   BookOpen,
+  Download,
   PanelRightClose,
   Plus,
   Star,
@@ -13,8 +14,10 @@ import {
   MAX_BOOK_TAG_LENGTH,
   MAX_BOOK_TAGS,
 } from '../../lib/book-organization'
+import { getReadingAssets } from '../../data/indexed-db/reading-asset-repository'
 import type { BookOrganizationPatch } from '../../data/indexed-db/book-repository'
-import type { BookRecord } from '../../types/book'
+import type { BookRecord, ReadingAsset } from '../../types/book'
+import type { ReadingAssetExportFormat } from '../../lib/reading-asset-export'
 
 interface BookDetailsSidebarProps {
   book: BookRecord
@@ -34,8 +37,15 @@ export function BookDetailsSidebar({
   const [tagDraft, setTagDraft] = useState('')
   const [tagError, setTagError] = useState<string>()
   const [isUpdating, setIsUpdating] = useState(false)
+  const [readingAssets, setReadingAssets] = useState<ReadingAsset[]>()
+  const [readingAssetsError, setReadingAssetsError] = useState<string>()
+  const [exportingFormat, setExportingFormat] =
+    useState<ReadingAssetExportFormat>()
   const tags = book.tags ?? []
   const readingStatus = getBookReadingStatus(book)
+  const bookmarkCount =
+    readingAssets?.filter((asset) => asset.kind === 'bookmark').length ?? 0
+  const highlightCount = (readingAssets?.length ?? 0) - bookmarkCount
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -45,6 +55,27 @@ export function BookDetailsSidebar({
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
+
+  useEffect(() => {
+    let cancelled = false
+
+    void getReadingAssets(book.id)
+      .then((assets) => {
+        if (!cancelled) setReadingAssets(assets)
+      })
+      .catch((loadError: unknown) => {
+        if (cancelled) return
+        setReadingAssetsError(
+          loadError instanceof Error
+            ? loadError.message
+            : '读取这本书的阅读记录失败。',
+        )
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [book.id])
 
   async function saveOrganization(
     patch: BookOrganizationPatch,
@@ -96,6 +127,26 @@ export function BookDetailsSidebar({
     await saveOrganization({
       tags: tags.filter((tag) => tag !== tagToRemove),
     })
+  }
+
+  async function handleExport(format: ReadingAssetExportFormat) {
+    if (!readingAssets?.length || exportingFormat) return
+    setExportingFormat(format)
+    setReadingAssetsError(undefined)
+    try {
+      const { downloadReadingAssets } = await import(
+        '../../lib/reading-asset-export'
+      )
+      downloadReadingAssets(book, readingAssets, format)
+    } catch (exportError) {
+      setReadingAssetsError(
+        exportError instanceof Error
+          ? exportError.message
+          : '导出阅读记录失败。',
+      )
+    } finally {
+      setExportingFormat(undefined)
+    }
   }
 
   return (
@@ -187,6 +238,54 @@ export function BookDetailsSidebar({
               <small>在书架中快速筛选这本书</small>
             </span>
           </button>
+        </section>
+
+        <section
+          className="book-details-section"
+          aria-labelledby="book-reading-assets-title"
+        >
+          <div className="book-details-section-heading">
+            <h3 id="book-reading-assets-title">导出阅读记录</h3>
+            <span>
+              {readingAssets
+                ? `${readingAssets.length} 条`
+                : readingAssetsError
+                  ? '读取失败'
+                  : '读取中…'}
+            </span>
+          </div>
+          <p className="book-sidebar-export-summary">
+            {readingAssets?.length
+              ? `${bookmarkCount} 个书签 · ${highlightCount} 条划线与笔记`
+              : readingAssets
+                ? '这本书还没有书签、划线或笔记。'
+                : readingAssetsError
+                  ? '暂时无法读取这本书的阅读记录。'
+                  : '正在整理这本书的书签、划线与笔记。'}
+          </p>
+          <div className="book-sidebar-export-actions" aria-label="导出格式">
+            <button
+              type="button"
+              disabled={!readingAssets?.length || Boolean(exportingFormat)}
+              onClick={() => void handleExport('markdown')}
+            >
+              <Download aria-hidden="true" size={14} strokeWidth={1.7} />
+              {exportingFormat === 'markdown' ? '正在导出…' : 'Markdown'}
+            </button>
+            <button
+              type="button"
+              disabled={!readingAssets?.length || Boolean(exportingFormat)}
+              onClick={() => void handleExport('text')}
+            >
+              <Download aria-hidden="true" size={14} strokeWidth={1.7} />
+              {exportingFormat === 'text' ? '正在导出…' : '纯文本'}
+            </button>
+          </div>
+          {readingAssetsError ? (
+            <p className="book-sidebar-export-error" role="alert">
+              {readingAssetsError}
+            </p>
+          ) : null}
         </section>
 
         <section
