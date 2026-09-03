@@ -5,6 +5,7 @@ import {
   PanelLeftClose,
   Search,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { TocItem } from '../../types/book'
 
 interface TocPanelProps {
@@ -67,31 +68,33 @@ export function TocPanel({
   onSearch,
   onSelect,
 }: TocPanelProps) {
+  const { t } = useTranslation()
+
   return (
-    <aside className="toc-panel" aria-label="目录">
+    <aside className="toc-panel" aria-label={t('reader.toc.label')}>
       <div className="toc-header">
-        <strong>卷舍</strong>
+        <strong>{t('common.brandShort')}</strong>
         <button className="sidebar-toggle" type="button" onClick={onClose}>
           <PanelLeftClose aria-hidden="true" size={19} strokeWidth={1.7} />
-          <span className="visually-hidden">关闭目录</span>
+          <span className="visually-hidden">{t('reader.toc.close')}</span>
         </button>
       </div>
-      <div className="navigation-tabs has-three" aria-label="书内导航">
+      <div className="navigation-tabs has-three" aria-label={t('reader.navigation')}>
         <button className="is-active" type="button" aria-current="page">
           <List aria-hidden="true" size={15} strokeWidth={1.7} />
-          目录
+          {t('common.toc')}
         </button>
         <button type="button" onClick={onSearch}>
           <Search aria-hidden="true" size={15} strokeWidth={1.7} />
-          搜索
+          {t('common.search')}
         </button>
         <button type="button" onClick={onShowAssets}>
           <NotebookPen aria-hidden="true" size={15} strokeWidth={1.7} />
-          书摘
+          {t('common.excerpts')}
         </button>
       </div>
       {items.length ? (
-        <nav aria-label="章节目录">
+        <nav aria-label={t('reader.toc.chapters')}>
           <ul className="toc-list">
             <TocEntries
               items={items}
@@ -101,12 +104,12 @@ export function TocPanel({
           </ul>
         </nav>
       ) : (
-        <p className="toc-empty">正在整理目录…</p>
+        <p className="toc-empty">{t('reader.toc.loading')}</p>
       )}
       <div className="toc-footer">
         <button type="button" onClick={onBack}>
           <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.7} />
-          返回书架
+          {t('common.backToLibrary')}
         </button>
       </div>
     </aside>

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '../../../i18n'
 import { getBookFile, updateBookReadingState } from '../../../data/indexed-db/book-repository'
 import { getReadingAssets } from '../../../data/indexed-db/reading-asset-repository'
 import type {
@@ -82,6 +84,7 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
 }
 
 export function useEpubReader(options: UseEpubReaderOptions) {
+  const { t } = useTranslation()
   const { bookRecord, preferences } = options
   const callbacksRef = useRef(options)
   callbacksRef.current = options
@@ -110,7 +113,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
     viewportSize: chapterViewportSize,
   } = chapterScroll
   const [isOpening, setIsOpening] = useState(true)
-  const [openingMessage, setOpeningMessage] = useState('正在读取书籍…')
+  const [openingMessageKey, setOpeningMessageKey] = useState('errors.readingBook')
   const [error, setError] = useState<string>()
 
   useEffect(() => {
@@ -147,7 +150,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
     }
     setError(undefined)
     setIsOpening(true)
-    setOpeningMessage('正在读取书籍…')
+    setOpeningMessageKey('errors.readingBook')
 
     let isCancelled = false
     let locationsReady = false
@@ -185,11 +188,11 @@ export function useEpubReader(options: UseEpubReaderOptions) {
           getBookFile(bookRecord.id),
           getReadingAssets(bookRecord.id),
         ])
-        if (!data) throw new Error('找不到原始 EPUB 文件。')
+        if (!data) throw new Error(i18n.t('errors.epubMissing'))
         if (isCancelled) return
         callbacksRef.current.onAssetsLoaded(storedReadingAssets)
         callbacksRef.current.onSearchSourceReady(data)
-        setOpeningMessage('正在排版正文…')
+        setOpeningMessageKey('errors.layingOut')
 
         runtime = await EpubReaderRuntime.create({
           data,
@@ -483,7 +486,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
           setError(
             readerError instanceof Error
               ? readerError.message
-              : '这本书暂时无法打开。',
+              : i18n.t('errors.openBook'),
           )
         }
       }
@@ -641,7 +644,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
     atChapterStart,
     atChapterEnd,
     isOpening,
-    openingMessage,
+    openingMessage: t(openingMessageKey),
     error,
     resetChapterBoundary,
     displayChapter,

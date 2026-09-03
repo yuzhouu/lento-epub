@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { ArchiveRestore, TriangleAlert } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
+import { getCurrentLanguage } from '../../i18n'
 import { formatBytes } from '../../lib/format-bytes'
 import type {
   LibraryBackupConflictResolution,
@@ -18,23 +21,23 @@ interface RestoreBackupDialogProps {
 
 const RESTORE_OPTIONS: Array<{
   value: LibraryBackupConflictResolution
-  label: string
-  description: string
+  labelKey: string
+  descriptionKey: string
 }> = [
   {
     value: 'overwrite',
-    label: '覆盖现有',
-    description: '采用备份中的 EPUB 与阅读进度',
+    labelKey: 'library.restore.overwrite',
+    descriptionKey: 'library.restore.overwriteDescription',
   },
   {
     value: 'keep-both',
-    label: '保留两本',
-    description: '现有书不变，另存备份副本',
+    labelKey: 'library.restore.keepBoth',
+    descriptionKey: 'library.restore.keepBothDescription',
   },
   {
     value: 'skip',
-    label: '跳过',
-    description: '保留当前书架中的版本',
+    labelKey: 'library.restore.skip',
+    descriptionKey: 'library.restore.skipDescription',
   },
 ]
 
@@ -42,9 +45,9 @@ function formatProgress(book: BookRecord): string {
   return `${Math.round(book.progress * 100)}%`
 }
 
-function formatLastOpened(book: BookRecord): string {
-  if (!book.lastOpenedAt) return '尚未阅读'
-  return new Intl.DateTimeFormat('zh-CN', {
+function formatLastOpened(book: BookRecord, t: TFunction): string {
+  if (!book.lastOpenedAt) return t('library.restore.unread')
+  return new Intl.DateTimeFormat(getCurrentLanguage(), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -55,7 +58,7 @@ function formatExportedAt(exportedAt: string | undefined): string | undefined {
   if (!exportedAt) return undefined
   const timestamp = Date.parse(exportedAt)
   if (!Number.isFinite(timestamp)) return undefined
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(getCurrentLanguage(), {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -70,6 +73,7 @@ export function RestoreBackupDialog({
   onCancel,
   onConfirm,
 }: RestoreBackupDialogProps) {
+  const { t } = useTranslation()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const cancelButtonRef = useRef<HTMLButtonElement>(null)
   const radioGroupId = useId()
@@ -132,27 +136,27 @@ export function RestoreBackupDialog({
       <div className="restore-dialog-heading">
         <ArchiveRestore aria-hidden="true" size={24} strokeWidth={1.55} />
         <div>
-          <h2 id="restore-backup-title">恢复前确认</h2>
+          <h2 id="restore-backup-title">{t('library.restore.title')}</h2>
           <p id="restore-backup-description">
-            {preview.bookCount} 本书 · {formatBytes(preview.totalBytes)}
-            {exportedAt ? ` · 备份于 ${exportedAt}` : ''}
+            {t('library.restore.summary', { count: preview.bookCount, size: formatBytes(preview.totalBytes) })}
+            {exportedAt ? ` · ${t('library.restore.exportedAt', { date: exportedAt })}` : ''}
           </p>
         </div>
       </div>
 
       <div className="restore-preview-summary">
-        <strong>{preview.directAddCount} 本可直接加入</strong>
+        <strong>{t('library.restore.direct', { count: preview.directAddCount })}</strong>
         <span>
           {preview.conflicts.length > 0
-            ? `${preview.conflicts.length} 本与当前书架冲突，请决定如何处理。`
-            : '没有发现冲突，当前书架中的其他书不会被删除。'}
+            ? t('library.restore.conflicts', { count: preview.conflicts.length })
+            : t('library.restore.noConflicts')}
         </span>
       </div>
 
       {preview.conflicts.length > 0 ? (
         <>
           <div className="restore-conflict-toolbar">
-            <span>批量选择</span>
+            <span>{t('library.restore.bulk')}</span>
             {RESTORE_OPTIONS.map((option) => (
               <button
                 key={option.value}
@@ -160,7 +164,7 @@ export function RestoreBackupDialog({
                 disabled={isRestoring}
                 onClick={() => setAllResolutions(option.value)}
               >
-                全部{option.label}
+                {t('library.restore.allOption', { option: t(option.labelKey) })}
               </button>
             ))}
           </div>
@@ -183,26 +187,26 @@ export function RestoreBackupDialog({
                       strokeWidth={1.8}
                     />
                     {conflict.reason === 'id'
-                      ? '同一书籍记录'
-                      : 'EPUB 内容相同'}
+                      ? t('library.restore.sameRecord')
+                      : t('library.restore.sameContent')}
                   </span>
                 </header>
 
                 <div className="restore-book-comparison">
                   <div>
-                    <strong>当前书架</strong>
-                    <span>阅读 {formatProgress(conflict.existingBook)}</span>
+                    <strong>{t('library.restore.current')}</strong>
+                    <span>{t('library.restore.reading', { progress: formatProgress(conflict.existingBook) })}</span>
                     <span>
                       {conflict.existingBook.chapterLabel ||
-                        formatLastOpened(conflict.existingBook)}
+                        formatLastOpened(conflict.existingBook, t)}
                     </span>
                   </div>
                   <div>
-                    <strong>备份版本</strong>
-                    <span>阅读 {formatProgress(conflict.backupBook)}</span>
+                    <strong>{t('library.restore.backup')}</strong>
+                    <span>{t('library.restore.reading', { progress: formatProgress(conflict.backupBook) })}</span>
                     <span>
                       {conflict.backupBook.chapterLabel ||
-                        formatLastOpened(conflict.backupBook)}
+                        formatLastOpened(conflict.backupBook, t)}
                     </span>
                   </div>
                 </div>
@@ -210,7 +214,7 @@ export function RestoreBackupDialog({
                 <div
                   className="restore-resolution-options"
                   role="radiogroup"
-                  aria-label={`《${conflict.backupBook.title}》的恢复方式`}
+                  aria-label={t('library.restore.resolutionLabel', { title: conflict.backupBook.title })}
                 >
                   {RESTORE_OPTIONS.map((option) => {
                     const inputId = `${radioGroupId}-${conflictIndex}-${option.value}`
@@ -243,8 +247,8 @@ export function RestoreBackupDialog({
                           }
                         />
                         <span>
-                          <strong>{option.label}</strong>
-                          <small>{option.description}</small>
+                          <strong>{t(option.labelKey)}</strong>
+                          <small>{t(option.descriptionKey)}</small>
                         </span>
                       </label>
                     )
@@ -258,7 +262,7 @@ export function RestoreBackupDialog({
 
       <div className="restore-dialog-note">
         <span>{preview.sourceName}</span>
-        <span>恢复只会合并这份备份，不会删除书架中的其他书。</span>
+        <span>{t('library.restore.note')}</span>
       </div>
 
       <div className="delete-dialog-actions restore-dialog-actions">
@@ -269,7 +273,7 @@ export function RestoreBackupDialog({
           disabled={isRestoring}
           onClick={onCancel}
         >
-          取消
+          {t('common.cancel')}
         </button>
         <button
           className="primary-button"
@@ -277,7 +281,7 @@ export function RestoreBackupDialog({
           disabled={isRestoring}
           onClick={() => onConfirm(new Map(resolutions))}
         >
-          {isRestoring ? '正在恢复…' : '确认恢复'}
+          {isRestoring ? t('library.restore.restoring') : t('library.restore.confirm')}
         </button>
       </div>
     </dialog>

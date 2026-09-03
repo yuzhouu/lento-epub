@@ -1,3 +1,5 @@
+import i18n from '../../i18n'
+
 const LOW_STORAGE_BYTES = 100 * 1024 * 1024
 const LOW_STORAGE_RATIO = 0.05
 
@@ -14,7 +16,7 @@ export class InsufficientStorageError extends Error {
   readonly availableBytes: number
 
   constructor(requiredBytes: number, availableBytes: number) {
-    super('浏览器存储空间不足。')
+    super(i18n.t('dataErrors.storageFull'))
     this.name = 'InsufficientStorageError'
     this.requiredBytes = requiredBytes
     this.availableBytes = availableBytes
@@ -80,10 +82,10 @@ function isQuotaExceededError(error: unknown): boolean {
 
 export function getStorageErrorMessage(error: unknown): string | undefined {
   if (error instanceof InsufficientStorageError) {
-    return '浏览器存储空间不足，无法添加这些书。请先删除不再需要的书，或释放设备空间后重试。'
+    return i18n.t('dataErrors.storageInsufficient')
   }
   if (isQuotaExceededError(error)) {
-    return '浏览器存储空间已不足，写入未完成。请先删除不再需要的书，或释放设备空间后重试。'
+    return i18n.t('dataErrors.storageWriteFailed')
   }
   return undefined
 }

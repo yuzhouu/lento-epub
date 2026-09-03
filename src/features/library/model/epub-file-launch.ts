@@ -1,3 +1,5 @@
+import i18n from '../../../i18n'
+
 export type EpubFileLaunchEvent =
   | { kind: 'files'; files: File[] }
   | { kind: 'error'; message: string }
@@ -32,7 +34,7 @@ export function createEpubFileLaunchBridge(): EpubFileLaunchBridge {
             try {
               return await handle.getFile()
             } catch {
-              throw new Error(`无法读取“${handle.name}”。`)
+              throw new Error(i18n.t('dataErrors.launchRead', { name: handle.name }))
             }
           }),
         )
@@ -43,7 +45,7 @@ export function createEpubFileLaunchBridge(): EpubFileLaunchBridge {
           message:
             error instanceof Error
               ? error.message
-              : '无法读取系统交给卷舍的 EPUB 文件。',
+              : i18n.t('dataErrors.launchReadGeneric'),
         })
       }
     }

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   discoverLocalFontFamilies,
   getCachedLocalFontFamilies,
@@ -6,6 +7,7 @@ import {
 } from '../model/local-font-service'
 
 export function useLocalFonts(selectedFont: string) {
+  const { t } = useTranslation()
   const [families, setFamilies] = useState(getCachedLocalFontFamilies)
   const [isDiscovering, setIsDiscovering] = useState(false)
   const [isPickerOpen, setIsPickerOpen] = useState(false)
@@ -24,22 +26,22 @@ export function useLocalFonts(selectedFont: string) {
       setIsPickerOpen(nextFamilies.length > 0)
       setMessage(
         nextFamilies.length > 0
-          ? `已发现 ${nextFamilies.length} 个系统字体。`
-          : '没有发现可用的系统字体。',
+          ? t('errors.localFontsFound', { count: nextFamilies.length })
+          : t('errors.noLocalFonts'),
       )
     } catch (error) {
       setMessage(
         error instanceof LocalFontDiscoveryUnsupportedError
-          ? '当前浏览器不支持发现系统字体，请使用桌面版 Chrome 或 Edge。'
+          ? t('errors.localFontsUnsupported')
           : error instanceof DOMException &&
               (error.name === 'NotAllowedError' || error.name === 'SecurityError')
-            ? '未获得系统字体访问权限，仍可使用预设字体。'
-            : '系统字体读取失败，请稍后重试。',
+            ? t('errors.localFontsDenied')
+            : t('errors.localFontsFailed'),
       )
     } finally {
       setIsDiscovering(false)
     }
-  }, [])
+  }, [t])
 
   return {
     options,

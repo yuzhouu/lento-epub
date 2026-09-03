@@ -152,6 +152,10 @@
   letter-spacing: 0.035em;
 }
 
+.library-footer .language-switcher {
+  margin-top: 3px;
+}
+
 .library-footer-separator {
   color: rgba(105, 114, 109, 0.48);
 }

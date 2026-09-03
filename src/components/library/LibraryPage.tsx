@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   BookOpenText,
   Files,
@@ -25,6 +26,7 @@ import { useLibraryStorage } from '../../features/library/hooks/useLibraryStorag
 import { LibraryToolbar } from '../../features/library/components/LibraryToolbar'
 import { LibraryStorageSummary } from '../../features/library/components/LibraryStorageSummary'
 import { useDeleteUndo } from '../../features/library/hooks/useDeleteUndo'
+import { LanguageSwitcher } from '../LanguageSwitcher'
 
 interface LibraryPageProps {
   books: BookRecord[]
@@ -51,6 +53,7 @@ export function LibraryPage({
   onUpdateBook,
   onOpen,
 }: LibraryPageProps) {
+  const { t } = useTranslation()
   const [managedBookId, setManagedBookId] = useState<string>()
   const drop = useEpubDrop(onImportFiles)
   const query = useLibraryQuery(books)
@@ -77,7 +80,7 @@ export function LibraryPage({
         message:
           updateError instanceof Error
             ? updateError.message
-            : '更新书籍信息失败。',
+            : t('library.updateFailed'),
       })
       throw updateError
     }
@@ -95,11 +98,11 @@ export function LibraryPage({
     >
       <header className="library-header">
         <div className="brand-lockup">
-          <h1>卷舍 · Lento</h1>
+          <h1>{t('common.brand')}</h1>
           <div className="brand-divider" />
           <div>
-            <p>把时间留给书。</p>
-            <span>Read without hurry.</span>
+            <p>{t('common.tagline')}</p>
+            <span>{t('common.slogan')}</span>
           </div>
         </div>
         <div className="library-actions">
@@ -177,14 +180,14 @@ export function LibraryPage({
                 ) : (
                   <div className="empty-library empty-library-filtered">
                     <Search aria-hidden="true" size={34} strokeWidth={1.25} />
-                    <h2>没有找到符合条件的书</h2>
-                    <p>换一个关键词，或清除当前筛选。</p>
+                    <h2>{t('library.searchEmptyTitle')}</h2>
+                    <p>{t('library.searchEmptyBody')}</p>
                     <button
                       className="secondary-button"
                       type="button"
                       onClick={query.clearFilters}
                     >
-                      清除筛选
+                      {t('library.clearFilters')}
                     </button>
                   </div>
                 )}
@@ -203,8 +206,8 @@ export function LibraryPage({
         ) : (
           <div className="empty-library">
             <BookOpenText aria-hidden="true" size={40} strokeWidth={1.2} />
-            <h2>这里还没有书</h2>
-            <p>选择或拖入 EPUB 文件，从一册书开始。</p>
+            <h2>{t('library.emptyTitle')}</h2>
+            <p>{t('library.emptyBody')}</p>
             <ImportBookButton
               compact
               isImporting={isImporting}
@@ -215,21 +218,22 @@ export function LibraryPage({
       </section>
 
       <footer className="library-footer">
-        <span className="library-footer-brand">卷舍 · Lento</span>
-        <nav aria-label="产品信息">
+        <span className="library-footer-brand">{t('common.brand')}</span>
+        <nav aria-label={t('library.productInfo')}>
           <span>© yuzhou</span>
           <span className="library-footer-separator" aria-hidden="true">·</span>
-          <a href="#/about">关于</a>
+          <a href="#/about">{t('common.about')}</a>
           <span className="library-footer-separator" aria-hidden="true">·</span>
-          <a href="#/privacy">隐私政策</a>
+          <a href="#/privacy">{t('common.privacy')}</a>
         </nav>
+        <LanguageSwitcher compact />
       </footer>
 
       {drop.isDraggingFiles ? (
         <div className="drop-import-overlay" aria-hidden="true">
           <Files size={38} strokeWidth={1.35} />
-          <strong>松开以添加 EPUB</strong>
-          <span>可以一次拖入多本书</span>
+          <strong>{t('library.dropTitle')}</strong>
+          <span>{t('library.dropBody')}</span>
         </div>
       ) : null}
 
@@ -247,15 +251,19 @@ export function LibraryPage({
           {libraryNotice ? (
             <LibraryAlert
               notice={libraryNotice}
-              dismissLabel="关闭提示"
+              dismissLabel={t('library.dismissNotice')}
               onDismiss={() => onLibraryNoticeChange(undefined)}
             />
           ) : null}
           {deletion.deletedEntry ? (
             <div className="library-toast delete-undo-toast" role="status">
-              <strong>已删除《{deletion.deletedEntry.book.title}》。</strong>
+              <strong>
+                {t('library.deleted', {
+                  title: deletion.deletedEntry.book.title,
+                })}
+              </strong>
               <button type="button" onClick={() => void deletion.undoDelete()}>
-                撤销
+                {t('library.undo')}
               </button>
             </div>
           ) : null}

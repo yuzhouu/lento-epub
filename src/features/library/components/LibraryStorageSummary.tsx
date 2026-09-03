@@ -1,4 +1,5 @@
 import { TriangleAlert } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { LibraryStorageInfo } from '../../../data/indexed-db/storage-capacity'
 import { formatBytes } from '../../../lib/format-bytes'
 
@@ -22,6 +23,7 @@ export function LibraryStorageSummary({
   hasActiveFilters,
   storageInfo,
 }: LibraryStorageSummaryProps) {
+  const { t } = useTranslation()
   const usagePercent =
     storageInfo?.usedBytes !== undefined && storageInfo.quotaBytes
       ? Math.min(100, (storageInfo.usedBytes / storageInfo.quotaBytes) * 100)
@@ -31,23 +33,23 @@ export function LibraryStorageSummary({
     <>
       <div className="section-heading">
         <div className="library-heading-copy">
-          <h2 id="library-title">我的书架</h2>
+          <h2 id="library-title">{t('library.heading')}</h2>
           <span>
             {hasActiveFilters
-              ? `${visibleBookCount} / ${bookCount} 本书`
-              : `${bookCount} 本书`}
+              ? t('library.storage.filteredCount', { visible: visibleBookCount, total: bookCount })
+              : t('common.books', { count: bookCount })}
           </span>
           <div
             className={`library-storage-overview${
               storageInfo?.isLow ? ' is-low' : ''
             }`}
             role="status"
-            title="包含 EPUB 文件、阅读数据与离线应用缓存"
+            title={t('library.storage.title')}
           >
             {storageInfo ? (
               storageInfo.quotaBytes !== undefined ? (
                 <>
-                  <span>总占用</span>
+                  <span>{t('library.storage.total')}</span>
                   <span className="library-storage-value">
                     {formatBytes(storageInfo.usedBytes ?? storageInfo.bookBytes)} /{' '}
                     {formatBytes(storageInfo.quotaBytes)}
@@ -57,10 +59,10 @@ export function LibraryStorageSummary({
                   </span>
                 </>
               ) : (
-                <span>书籍占用 {formatBytes(storageInfo.bookBytes)}</span>
+                <span>{t('library.storage.books', { size: formatBytes(storageInfo.bookBytes) })}</span>
               )
             ) : (
-              <span>正在统计空间…</span>
+              <span>{t('library.storage.calculating')}</span>
             )}
           </div>
         </div>
@@ -70,12 +72,12 @@ export function LibraryStorageSummary({
         <div className="library-storage-warning" role="alert">
           <TriangleAlert aria-hidden="true" size={19} strokeWidth={1.7} />
           <div>
-            <strong>浏览器存储空间不足</strong>
+            <strong>{t('library.storage.lowTitle')}</strong>
             <span>
               {storageInfo.availableBytes !== undefined
-                ? `仅剩约 ${formatBytes(storageInfo.availableBytes)}，继续添加或恢复书籍可能失败。`
-                : '继续添加或恢复书籍可能失败。'}
-              请先删除不再需要的书，或释放设备空间。
+                ? t('library.storage.lowRemaining', { size: formatBytes(storageInfo.availableBytes) })
+                : t('library.storage.lowUnknown')}{' '}
+              {t('library.storage.lowAction')}
             </span>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import type { BookRecord, ReadingAsset } from '../types/book'
+import i18n, { getCurrentLanguage } from '../i18n'
 
 export type ReadingAssetExportFormat = 'markdown' | 'text'
 
@@ -13,7 +14,7 @@ export function createReadingAssetExportContent(
 }
 
 function formatDate(timestamp: number): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(getCurrentLanguage(), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -21,21 +22,21 @@ function formatDate(timestamp: number): string {
 }
 
 function getAssetLocation(asset: ReadingAsset): string {
-  return asset.chapterLabel?.trim() || '未标注章节'
+  return asset.chapterLabel?.trim() || i18n.t('exportData.unknownChapter')
 }
 
 function createMarkdown(book: BookRecord, assets: ReadingAsset[]): string {
   const bookmarks = assets.filter((asset) => asset.kind === 'bookmark')
   const highlights = assets.filter((asset) => asset.kind === 'highlight')
   const lines = [
-    `# 《${book.title}》阅读记录`,
+    `# ${i18n.t('exportData.title', { title: book.title })}`,
     '',
-    `作者：${book.author || '未知作者'}`,
-    `导出时间：${formatDate(Date.now())}`,
+    i18n.t('exportData.author', { author: book.author || i18n.t('exportData.unknownAuthor') }),
+    i18n.t('exportData.exportedAt', { date: formatDate(Date.now()) }),
   ]
 
   if (bookmarks.length > 0) {
-    lines.push('', '## 书签', '')
+    lines.push('', `## ${i18n.t('exportData.bookmarks')}`, '')
     bookmarks.forEach((bookmark) => {
       lines.push(
         `- ${getAssetLocation(bookmark)} · ${formatDate(bookmark.createdAt)}`,
@@ -44,7 +45,7 @@ function createMarkdown(book: BookRecord, assets: ReadingAsset[]): string {
   }
 
   if (highlights.length > 0) {
-    lines.push('', '## 划线与笔记')
+    lines.push('', `## ${i18n.t('exportData.highlights')}`)
     highlights.forEach((highlight) => {
       lines.push(
         '',
@@ -52,12 +53,14 @@ function createMarkdown(book: BookRecord, assets: ReadingAsset[]): string {
         '',
         ...highlight.text.split('\n').map((line) => `> ${line}`),
       )
-      if (highlight.note) lines.push('', `批注：${highlight.note}`)
-      lines.push('', `记录于 ${formatDate(highlight.createdAt)}`)
+      if (highlight.note) {
+        lines.push('', i18n.t('exportData.note', { note: highlight.note }))
+      }
+      lines.push('', i18n.t('exportData.recordedAt', { date: formatDate(highlight.createdAt) }))
     })
   }
 
-  if (assets.length === 0) lines.push('', '暂无书签、划线或笔记。')
+  if (assets.length === 0) lines.push('', i18n.t('exportData.empty'))
   return `${lines.join('\n').trim()}\n`
 }
 
@@ -65,13 +68,13 @@ function createPlainText(book: BookRecord, assets: ReadingAsset[]): string {
   const bookmarks = assets.filter((asset) => asset.kind === 'bookmark')
   const highlights = assets.filter((asset) => asset.kind === 'highlight')
   const lines = [
-    `《${book.title}》阅读记录`,
-    `作者：${book.author || '未知作者'}`,
-    `导出时间：${formatDate(Date.now())}`,
+    i18n.t('exportData.title', { title: book.title }),
+    i18n.t('exportData.author', { author: book.author || i18n.t('exportData.unknownAuthor') }),
+    i18n.t('exportData.exportedAt', { date: formatDate(Date.now()) }),
   ]
 
   if (bookmarks.length > 0) {
-    lines.push('', '书签')
+    lines.push('', i18n.t('exportData.bookmarks'))
     bookmarks.forEach((bookmark) => {
       lines.push(
         `- ${getAssetLocation(bookmark)} · ${formatDate(bookmark.createdAt)}`,
@@ -80,15 +83,17 @@ function createPlainText(book: BookRecord, assets: ReadingAsset[]): string {
   }
 
   if (highlights.length > 0) {
-    lines.push('', '划线与笔记')
+    lines.push('', i18n.t('exportData.highlights'))
     highlights.forEach((highlight) => {
       lines.push('', `[${getAssetLocation(highlight)}]`, highlight.text)
-      if (highlight.note) lines.push(`批注：${highlight.note}`)
-      lines.push(`记录于 ${formatDate(highlight.createdAt)}`)
+      if (highlight.note) {
+        lines.push(i18n.t('exportData.note', { note: highlight.note }))
+      }
+      lines.push(i18n.t('exportData.recordedAt', { date: formatDate(highlight.createdAt) }))
     })
   }
 
-  if (assets.length === 0) lines.push('', '暂无书签、划线或笔记。')
+  if (assets.length === 0) lines.push('', i18n.t('exportData.empty'))
   return `${lines.join('\n').trim()}\n`
 }
 
@@ -97,7 +102,7 @@ function createSafeFileName(value: string): string {
     .trim()
     .replace(/[\\/:*?"<>|]/g, '-')
     .replace(/\s+/g, ' ')
-  return normalized || '阅读记录'
+  return normalized || i18n.t('exportData.defaultName')
 }
 
 export function downloadReadingAssets(
@@ -111,7 +116,7 @@ export function downloadReadingAssets(
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${createSafeFileName(book.title)}-阅读记录.${extension}`
+  link.download = `${createSafeFileName(book.title)}-${i18n.t('exportData.fileSuffix')}.${extension}`
   link.hidden = true
   document.body.append(link)
   link.click()

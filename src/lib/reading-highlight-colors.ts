@@ -3,22 +3,22 @@ import type { ReadingHighlightColor } from '../types/book'
 export const NOTE_HIGHLIGHT_COLOR: ReadingHighlightColor = 'violet'
 
 export const QUICK_HIGHLIGHT_COLOR_OPTIONS = [
-  { value: 'yellow', label: '荧光黄' },
-  { value: 'orange', label: '杏橙' },
-  { value: 'lime', label: '青柠' },
-  { value: 'green', label: '薄荷绿' },
-  { value: 'cyan', label: '晴蓝' },
-  { value: 'blue', label: '矢车蓝' },
-  { value: 'rose', label: '珊瑚粉' },
+  { value: 'yellow', labelKey: 'reader.assets.colorYellow' },
+  { value: 'orange', labelKey: 'reader.assets.colorOrange' },
+  { value: 'lime', labelKey: 'reader.assets.colorLime' },
+  { value: 'green', labelKey: 'reader.assets.colorGreen' },
+  { value: 'cyan', labelKey: 'reader.assets.colorCyan' },
+  { value: 'blue', labelKey: 'reader.assets.colorBlue' },
+  { value: 'rose', labelKey: 'reader.assets.colorRose' },
 ] as const satisfies ReadonlyArray<{
   value: ReadingHighlightColor
-  label: string
+  labelKey: string
 }>
 
 export const HIGHLIGHT_COLOR_OPTIONS = [
   ...QUICK_HIGHLIGHT_COLOR_OPTIONS,
-  { value: NOTE_HIGHLIGHT_COLOR, label: '批注紫' },
+  { value: NOTE_HIGHLIGHT_COLOR, labelKey: 'reader.assets.colorPurple' },
 ] as const satisfies ReadonlyArray<{
   value: ReadingHighlightColor
-  label: string
+  labelKey: string
 }>

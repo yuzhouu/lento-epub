@@ -1,3 +1,5 @@
+import { getCurrentLanguage } from '../i18n'
+
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
 
 export function formatBytes(bytes: number): string {
@@ -10,7 +12,7 @@ export function formatBytes(bytes: number): string {
   const value = bytes / 1024 ** unitIndex
   const maximumFractionDigits = value < 10 && unitIndex > 0 ? 1 : 0
 
-  return `${new Intl.NumberFormat('zh-CN', {
+  return `${new Intl.NumberFormat(getCurrentLanguage(), {
     maximumFractionDigits,
   }).format(value)} ${BYTE_UNITS[unitIndex]}`
 }

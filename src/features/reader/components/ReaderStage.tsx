@@ -6,6 +6,7 @@ import {
   type UIEvent,
 } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { ReaderFlow } from '../model/reader-preferences'
 
 interface ReaderStageProps {
@@ -37,6 +38,7 @@ function ChapterScrollbar({
   viewportSize,
   onScroll,
 }: ChapterScrollbarProps) {
+  const { t } = useTranslation()
   const scrollbarRef = useRef<HTMLDivElement>(null)
   const synchronizedScrollTopRef = useRef<number | undefined>(undefined)
   const hasOverflow = scrollSize > viewportSize + 1
@@ -80,7 +82,7 @@ function ChapterScrollbar({
       role="scrollbar"
       tabIndex={0}
       aria-controls="reader-epub-viewer"
-      aria-label="本章滚动位置"
+      aria-label={t('reader.stage.scrollPosition')}
       aria-orientation="vertical"
       aria-valuemin={0}
       aria-valuemax={100}
@@ -111,6 +113,7 @@ export function ReaderStage({
   onPageTurn,
   onChapterScroll,
 }: ReaderStageProps) {
+  const { t } = useTranslation()
   const stageClassName = [
     'reader-stage',
     flow !== 'paginated' ? 'is-scroll-flow' : '',
@@ -126,10 +129,10 @@ export function ReaderStage({
     >
       {error ? (
         <div className="reader-error" role="alert">
-          <h1>没有打开这本书</h1>
+          <h1>{t('reader.stage.openFailed')}</h1>
           <p>{error}</p>
           <button type="button" onClick={onBack}>
-            返回书架
+            {t('reader.stage.back')}
           </button>
         </div>
       ) : (
@@ -153,7 +156,7 @@ export function ReaderStage({
               <button
                 className="page-turn-zone is-previous"
                 type="button"
-                aria-label="点击左侧区域翻到上一页"
+                aria-label={t('reader.stage.previousZone')}
                 onClick={() => onPageTurn('previous')}
               >
                 <ChevronLeft aria-hidden="true" size={22} strokeWidth={1.5} />
@@ -161,7 +164,7 @@ export function ReaderStage({
               <button
                 className="page-turn-zone is-next"
                 type="button"
-                aria-label="点击右侧区域翻到下一页"
+                aria-label={t('reader.stage.nextZone')}
                 onClick={() => onPageTurn('next')}
               >
                 <ChevronRight aria-hidden="true" size={22} strokeWidth={1.5} />
@@ -172,7 +175,7 @@ export function ReaderStage({
             <div className="reader-loading" role="status" aria-live="polite">
               <span className="reader-loading-spinner" aria-hidden="true" />
               <strong>{openingMessage}</strong>
-              <span>较大的书籍可能需要一点时间</span>
+              <span>{t('reader.stage.largeBook')}</span>
             </div>
           ) : null}
         </>

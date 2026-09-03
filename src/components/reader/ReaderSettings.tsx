@@ -6,6 +6,7 @@ import {
   RefreshCw,
   Sun,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   getReadableLocalFontName,
   getReaderFontFamily,
@@ -25,6 +26,7 @@ import {
   LOCAL_FONT_PREVIEW_ZH,
 } from '../../features/reader/components/LocalFontPicker'
 import { useLocalFonts } from '../../features/reader/hooks/useLocalFonts'
+import { LanguageSwitcher } from '../LanguageSwitcher'
 
 export type {
   ReaderFlow,
@@ -57,50 +59,50 @@ interface ReaderSettingsProps {
 
 const THEME_OPTIONS: Array<{
   value: ReaderTheme
-  label: string
+  labelKey: string
   icon: typeof Sun
 }> = [
-  { value: 'paper', label: '纸张', icon: Sun },
-  { value: 'light', label: '明亮', icon: Sun },
-  { value: 'night', label: '夜间', icon: Moon },
+  { value: 'paper', labelKey: 'reader.settingsPanel.paper', icon: Sun },
+  { value: 'light', labelKey: 'reader.settingsPanel.light', icon: Sun },
+  { value: 'night', labelKey: 'reader.settingsPanel.night', icon: Moon },
 ]
 
 const FONT_OPTIONS: Array<{
   value: ReaderFontPreset
-  label: string
+  labelKey: string
   previewClassName: string
 }> = [
-  { value: 'publisher', label: '原书', previewClassName: 'font-publisher' },
-  { value: 'serif', label: '宋体', previewClassName: 'font-serif' },
-  { value: 'sans', label: '黑体', previewClassName: 'font-sans' },
-  { value: 'kai', label: '楷体', previewClassName: 'font-kai' },
+  { value: 'publisher', labelKey: 'reader.settingsPanel.publisher', previewClassName: 'font-publisher' },
+  { value: 'serif', labelKey: 'reader.settingsPanel.serif', previewClassName: 'font-serif' },
+  { value: 'sans', labelKey: 'reader.settingsPanel.sans', previewClassName: 'font-sans' },
+  { value: 'kai', labelKey: 'reader.settingsPanel.kai', previewClassName: 'font-kai' },
 ]
 
 const LINE_HEIGHT_OPTIONS: Array<{
   value: ReaderLineHeight
-  label: string
+  labelKey: string
 }> = [
-  { value: 'compact', label: '紧凑' },
-  { value: 'standard', label: '标准' },
-  { value: 'relaxed', label: '宽松' },
+  { value: 'compact', labelKey: 'reader.settingsPanel.compact' },
+  { value: 'standard', labelKey: 'reader.settingsPanel.standard' },
+  { value: 'relaxed', labelKey: 'reader.settingsPanel.relaxed' },
 ]
 
 const READER_WIDTH_OPTIONS: Array<{
   value: ReaderWidth
-  label: string
+  labelKey: string
 }> = [
-  { value: 'narrow', label: '窄' },
-  { value: 'standard', label: '标准' },
-  { value: 'wide', label: '宽' },
+  { value: 'narrow', labelKey: 'reader.settingsPanel.narrow' },
+  { value: 'standard', labelKey: 'reader.settingsPanel.standard' },
+  { value: 'wide', labelKey: 'reader.settingsPanel.wide' },
 ]
 
 const PARAGRAPH_STYLE_OPTIONS: Array<{
   value: ReaderParagraphStyle
-  label: string
+  labelKey: string
 }> = [
-  { value: 'publisher', label: '原书' },
-  { value: 'indent', label: '缩进' },
-  { value: 'spaced', label: '段间留白' },
+  { value: 'publisher', labelKey: 'reader.settingsPanel.publisher' },
+  { value: 'indent', labelKey: 'reader.settingsPanel.indent' },
+  { value: 'spaced', labelKey: 'reader.settingsPanel.spaced' },
 ]
 
 export function ReaderSettings({
@@ -123,24 +125,25 @@ export function ReaderSettings({
   onClickPaginationChange,
   onThemeChange,
 }: ReaderSettingsProps) {
+  const { t } = useTranslation()
   const selectedLocalFont = font.source === 'local' ? font.family : ''
   const localFonts = useLocalFonts(selectedLocalFont)
 
   return (
-    <div className="settings-popover" role="dialog" aria-label="阅读设置">
+    <div className="settings-popover" role="dialog" aria-label={t('reader.settings')}>
       <section
         className="settings-section"
         aria-labelledby="text-settings-heading"
       >
         <h2 className="settings-section-heading" id="text-settings-heading">
-          文字
+          {t('reader.settingsPanel.text')}
         </h2>
         <div className="settings-row">
-          <span className="settings-field-label">字号</span>
+          <span className="settings-field-label">{t('reader.settingsPanel.fontSize')}</span>
           <div className="font-stepper">
             <button
               type="button"
-              aria-label="减小字号"
+              aria-label={t('reader.settingsPanel.decreaseFont')}
               onClick={() => onFontSizeChange(Math.max(15, fontSize - 1))}
             >
               <Minus size={16} strokeWidth={1.6} />
@@ -148,7 +151,7 @@ export function ReaderSettings({
             <output>{fontSize}</output>
             <button
               type="button"
-              aria-label="增大字号"
+              aria-label={t('reader.settingsPanel.increaseFont')}
               onClick={() => onFontSizeChange(Math.min(26, fontSize + 1))}
             >
               <Plus size={16} strokeWidth={1.6} />
@@ -156,9 +159,9 @@ export function ReaderSettings({
           </div>
         </div>
         <div className="settings-row font-settings-row">
-          <span className="settings-field-label">字体</span>
-          <div className="font-options" aria-label="正文字体">
-            {FONT_OPTIONS.map(({ value, label, previewClassName }) => (
+          <span className="settings-field-label">{t('reader.settingsPanel.font')}</span>
+          <div className="font-options" aria-label={t('reader.settingsPanel.bodyFont')}>
+            {FONT_OPTIONS.map(({ value, labelKey, previewClassName }) => (
               <button
                 className={`${previewClassName}${
                   font.source === 'preset' && font.preset === value
@@ -174,7 +177,7 @@ export function ReaderSettings({
                   onFontChange({ source: 'preset', preset: value })
                 }
               >
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </div>
@@ -188,8 +191,8 @@ export function ReaderSettings({
                 onClick={() => void localFonts.discover()}
               >
                 {localFonts.isDiscovering
-                  ? '正在读取系统字体…'
-                  : '发现系统字体'}
+                  ? t('reader.settingsPanel.discoveringFonts')
+                  : t('reader.settingsPanel.discoverFonts')}
               </button>
             ) : (
               <>
@@ -205,7 +208,7 @@ export function ReaderSettings({
                         {selectedLocalFont
                           ? getReadableLocalFontName(selectedLocalFont) ??
                             selectedLocalFont
-                          : '选择系统字体'}
+                          : t('reader.settingsPanel.chooseSystemFont')}
                       </strong>
                       <small
                         className={
@@ -231,7 +234,7 @@ export function ReaderSettings({
                             <span lang="en">{LOCAL_FONT_PREVIEW_EN}</span>
                           </>
                         ) : (
-                          '查看中英文样张后再选择'
+                          t('reader.settingsPanel.chooseFontHint')
                         )}
                       </small>
                     </span>
@@ -246,15 +249,15 @@ export function ReaderSettings({
                     className="local-font-refresh-button"
                     type="button"
                     disabled={localFonts.isDiscovering}
-                    aria-label="重新发现系统字体"
+                    aria-label={t('reader.settingsPanel.rediscoverFonts')}
                     aria-describedby="local-font-status"
-                    title="重新发现系统字体"
+                    title={t('reader.settingsPanel.rediscoverFonts')}
                     onClick={() => void localFonts.discover()}
                   >
                     <RefreshCw aria-hidden="true" size={14} strokeWidth={1.6} />
                     <span>
-                      <strong>{localFonts.options.length} 种</strong>
-                      <small>{localFonts.isDiscovering ? '读取中' : '刷新'}</small>
+                      <strong>{t('reader.settingsPanel.fontCount', { count: localFonts.options.length })}</strong>
+                      <small>{localFonts.isDiscovering ? t('common.loading') : t('common.refreshing')}</small>
                     </span>
                   </button>
                 </div>
@@ -287,12 +290,12 @@ export function ReaderSettings({
           className="settings-section-heading"
           id="typography-settings-heading"
         >
-          排版
+          {t('reader.settingsPanel.typography')}
         </h2>
         <div className="settings-row typography-settings-row">
-          <span className="settings-field-label">行距</span>
-          <div className="setting-options" aria-label="正文行距">
-            {LINE_HEIGHT_OPTIONS.map(({ value, label }) => (
+          <span className="settings-field-label">{t('reader.settingsPanel.lineHeight')}</span>
+          <div className="setting-options" aria-label={t('reader.settingsPanel.lineHeight')}>
+            {LINE_HEIGHT_OPTIONS.map(({ value, labelKey }) => (
               <button
                 className={lineHeight === value ? 'is-selected' : undefined}
                 key={value}
@@ -300,15 +303,15 @@ export function ReaderSettings({
                 aria-pressed={lineHeight === value}
                 onClick={() => onLineHeightChange(value)}
               >
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </div>
         </div>
         <div className="settings-row typography-settings-row">
-          <span className="settings-field-label">阅读宽度</span>
-          <div className="setting-options" aria-label="正文阅读宽度">
-            {READER_WIDTH_OPTIONS.map(({ value, label }) => (
+          <span className="settings-field-label">{t('reader.settingsPanel.width')}</span>
+          <div className="setting-options" aria-label={t('reader.settingsPanel.width')}>
+            {READER_WIDTH_OPTIONS.map(({ value, labelKey }) => (
               <button
                 className={readerWidth === value ? 'is-selected' : undefined}
                 key={value}
@@ -316,18 +319,18 @@ export function ReaderSettings({
                 aria-pressed={readerWidth === value}
                 onClick={() => onReaderWidthChange(value)}
               >
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </div>
         </div>
         <div className="settings-row typography-settings-row">
-          <span className="settings-field-label">段落</span>
+          <span className="settings-field-label">{t('reader.settingsPanel.paragraph')}</span>
           <div
             className="setting-options paragraph-style-options"
-            aria-label="正文段落样式"
+            aria-label={t('reader.settingsPanel.paragraph')}
           >
-            {PARAGRAPH_STYLE_OPTIONS.map(({ value, label }) => (
+            {PARAGRAPH_STYLE_OPTIONS.map(({ value, labelKey }) => (
               <button
                 className={paragraphStyle === value ? 'is-selected' : undefined}
                 key={value}
@@ -335,7 +338,7 @@ export function ReaderSettings({
                 aria-pressed={paragraphStyle === value}
                 onClick={() => onParagraphStyleChange(value)}
               >
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </div>
@@ -349,42 +352,42 @@ export function ReaderSettings({
           className="settings-section-heading"
           id="reading-preferences-heading"
         >
-          阅读偏好
+          {t('reader.settingsPanel.preferences')}
         </h2>
         <div className="settings-row reading-flow-settings-row">
-          <span className="settings-field-label">阅读方式</span>
-          <div className="flow-options" aria-label="阅读方式">
+          <span className="settings-field-label">{t('reader.settingsPanel.flow')}</span>
+          <div className="flow-options" aria-label={t('reader.settingsPanel.flow')}>
             <button
               className={flow === 'chapter' ? 'is-selected' : undefined}
               type="button"
-              aria-label="逐章滚动"
+              aria-label={t('reader.settingsPanel.chapterLabel')}
               aria-pressed={flow === 'chapter'}
               onClick={() => onFlowChange('chapter')}
             >
-              逐章
+              {t('reader.settingsPanel.chapter')}
             </button>
             <button
               className={flow === 'continuous' ? 'is-selected' : undefined}
               type="button"
-              aria-label="连续滚动"
+              aria-label={t('reader.settingsPanel.continuousLabel')}
               aria-pressed={flow === 'continuous'}
               onClick={() => onFlowChange('continuous')}
             >
-              连续
+              {t('reader.settingsPanel.continuous')}
             </button>
             <button
               className={flow === 'paginated' ? 'is-selected' : undefined}
               type="button"
-              aria-label="分页阅读"
+              aria-label={t('reader.settingsPanel.paginatedLabel')}
               aria-pressed={flow === 'paginated'}
               onClick={() => onFlowChange('paginated')}
             >
-              分页
+              {t('reader.settingsPanel.paginated')}
             </button>
           </div>
         </div>
         {flow === 'paginated' ? (
-          <div className="pagination-settings" aria-label="分页设置">
+          <div className="pagination-settings" aria-label={t('reader.settingsPanel.paginationSettings')}>
             <button
               className="preference-toggle"
               type="button"
@@ -393,8 +396,8 @@ export function ReaderSettings({
               onClick={() => onKeyboardPaginationChange(!keyboardPagination)}
             >
               <span>
-                <span className="preference-toggle-label">方向键翻页</span>
-                <small>使用键盘左右方向键</small>
+                <span className="preference-toggle-label">{t('reader.settingsPanel.keyboardPagination')}</span>
+                <small>{t('reader.settingsPanel.keyboardPaginationHint')}</small>
               </span>
               <span className="toggle-track" aria-hidden="true">
                 <span />
@@ -408,8 +411,8 @@ export function ReaderSettings({
               onClick={() => onClickPaginationChange(!clickPagination)}
             >
               <span>
-                <span className="preference-toggle-label">点击两侧翻页</span>
-                <small>点击正文左右边缘区域</small>
+                <span className="preference-toggle-label">{t('reader.settingsPanel.clickPagination')}</span>
+                <small>{t('reader.settingsPanel.clickPaginationHint')}</small>
               </span>
               <span className="toggle-track" aria-hidden="true">
                 <span />
@@ -426,10 +429,10 @@ export function ReaderSettings({
           className="settings-section-heading"
           id="appearance-settings-heading"
         >
-          外观
+          {t('reader.settingsPanel.appearance')}
         </h2>
-        <div className="theme-options" aria-label="背景主题">
-          {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+        <div className="theme-options" aria-label={t('reader.settingsPanel.theme')}>
+          {THEME_OPTIONS.map(({ value, labelKey, icon: Icon }) => (
             <button
               className={theme === value ? 'is-selected' : undefined}
               key={value}
@@ -438,10 +441,14 @@ export function ReaderSettings({
               onClick={() => onThemeChange(value)}
             >
               <Icon size={16} strokeWidth={1.5} />
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
+      </section>
+      <section className="settings-section settings-language-section">
+        <h2 className="settings-section-heading">{t('language.label')}</h2>
+        <LanguageSwitcher />
       </section>
     </div>
   )

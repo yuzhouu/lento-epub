@@ -6,10 +6,10 @@ export const BOOK_READING_STATUSES: readonly BookReadingStatus[] = [
   'finished',
 ]
 
-export const BOOK_READING_STATUS_LABELS: Record<BookReadingStatus, string> = {
-  unread: '未读',
-  reading: '在读',
-  finished: '读完',
+export const BOOK_READING_STATUS_KEYS: Record<BookReadingStatus, string> = {
+  unread: 'library.status.unread',
+  reading: 'library.status.reading',
+  finished: 'library.status.finished',
 }
 
 export const MAX_BOOK_TAGS = 8

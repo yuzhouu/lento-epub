@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { TocItem } from '../../../types/book'
 import type { ReaderFlow } from '../model/reader-preferences'
 
@@ -27,6 +28,8 @@ export function ReaderFooter({
   onForward,
   onDisplayChapter,
 }: ReaderFooterProps) {
+  const { t } = useTranslation()
+
   return (
     <>
       <footer
@@ -37,26 +40,26 @@ export function ReaderFooter({
         }`}
         aria-label={
           flow === 'paginated'
-            ? '阅读进度与翻页'
+            ? t('reader.footer.progressAndPages')
             : offerPreviousChapter || offerNextChapter
-              ? '阅读进度与章节导航'
-              : '阅读进度'
+              ? t('reader.footer.progressAndChapters')
+              : t('reader.footer.progress')
         }
       >
         {flow === 'paginated' ? (
           <button type="button" onClick={onBackward}>
             <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.5} />
-            上一页
+            {t('reader.footer.previousPage')}
           </button>
         ) : offerPreviousChapter && previousChapter ? (
           <button
             className="chapter-previous-button"
             type="button"
-            aria-label={`进入上一章：${previousChapter.label}`}
+            aria-label={t('reader.footer.enterPrevious', { chapter: previousChapter.label })}
             onClick={() => onDisplayChapter(previousChapter.href)}
           >
             <ChevronLeft aria-hidden="true" size={18} strokeWidth={1.5} />
-            上一章
+            {t('reader.footer.previousChapter')}
             <span className="chapter-boundary-label">
               · {previousChapter.label}
             </span>
@@ -64,7 +67,7 @@ export function ReaderFooter({
         ) : null}
         <span
           className="reader-chapter-progress"
-          aria-label={`本章进度 ${chapterPercent}%`}
+          aria-label={t('reader.footer.chapterProgress', { percent: chapterPercent })}
         >
           {chapterPercent}%
         </span>
@@ -74,20 +77,20 @@ export function ReaderFooter({
             type="button"
             aria-label={
               atChapterEnd && nextChapter
-                ? `进入下一章：${nextChapter.label}`
-                : '下一页'
+                ? t('reader.footer.enterNext', { chapter: nextChapter.label })
+                : t('reader.footer.nextPage')
             }
             onClick={onForward}
           >
             {atChapterEnd && nextChapter ? (
               <>
-                下一章
+                {t('reader.footer.nextChapter')}
                 <span className="chapter-boundary-label">
                   · {nextChapter.label}
                 </span>
               </>
             ) : (
-              '下一页'
+              t('reader.footer.nextPage')
             )}
             <ChevronRight aria-hidden="true" size={18} strokeWidth={1.5} />
           </button>
@@ -95,10 +98,10 @@ export function ReaderFooter({
           <button
             className="chapter-next-button"
             type="button"
-            aria-label={`进入下一章：${nextChapter.label}`}
+            aria-label={t('reader.footer.enterNext', { chapter: nextChapter.label })}
             onClick={() => onDisplayChapter(nextChapter.href)}
           >
-            下一章
+            {t('reader.footer.nextChapter')}
             <span className="chapter-boundary-label">· {nextChapter.label}</span>
             <ChevronRight aria-hidden="true" size={18} strokeWidth={1.5} />
           </button>

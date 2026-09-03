@@ -7,6 +7,7 @@ import {
   Search,
   Settings,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ReaderSettings } from '../../../components/reader/ReaderSettings'
 import type { ReaderPreferenceController } from '../hooks/useReaderPreferences'
 import type { ReaderFlow } from '../model/reader-preferences'
@@ -47,6 +48,8 @@ export function ReaderHeader({
   onSettingsToggle,
   onFlowChange,
 }: ReaderHeaderProps) {
+  const { t } = useTranslation()
+
   return (
     <header className="reader-header">
       <div className="reader-context" aria-live="polite">
@@ -57,12 +60,12 @@ export function ReaderHeader({
             onClick={onOpenNavigation}
           >
             <PanelLeftOpen aria-hidden="true" size={19} strokeWidth={1.7} />
-            <span className="visually-hidden">打开书内导航</span>
+            <span className="visually-hidden">{t('reader.openNavigation')}</span>
           </button>
         ) : null}
         <strong>{title}</strong>
         <span aria-hidden="true">/</span>
-        <span title={chapterLabel}>{chapterLabel || '正在打开…'}</span>
+        <span title={chapterLabel}>{chapterLabel || t('reader.opening')}</span>
       </div>
       <div className="reader-tools">
         <button
@@ -72,7 +75,7 @@ export function ReaderHeader({
           onClick={() => onNavigationToggle('toc')}
         >
           <List aria-hidden="true" size={18} strokeWidth={1.7} />
-          <span>目录</span>
+          <span>{t('common.toc')}</span>
         </button>
         <button
           className="reader-tool-button"
@@ -81,7 +84,7 @@ export function ReaderHeader({
           onClick={() => onNavigationToggle('search')}
         >
           <Search aria-hidden="true" size={18} strokeWidth={1.7} />
-          <span>搜索</span>
+          <span>{t('common.search')}</span>
         </button>
         <button
           className="reader-tool-button"
@@ -90,12 +93,12 @@ export function ReaderHeader({
           onClick={() => onNavigationToggle('assets')}
         >
           <NotebookPen aria-hidden="true" size={18} strokeWidth={1.7} />
-          <span>书摘</span>
+          <span>{t('common.excerpts')}</span>
         </button>
         <button
           className="reader-tool-button reader-bookmark-button"
           type="button"
-          aria-label={hasCurrentBookmark ? '移除当前页书签' : '为当前页添加书签'}
+          aria-label={hasCurrentBookmark ? t('reader.removeBookmark') : t('reader.addBookmark')}
           aria-pressed={hasCurrentBookmark}
           disabled={!canBookmark || isSavingBookmark}
           onClick={onBookmarkToggle}
@@ -106,7 +109,7 @@ export function ReaderHeader({
             strokeWidth={1.7}
             fill={hasCurrentBookmark ? 'currentColor' : 'none'}
           />
-          <span>{hasCurrentBookmark ? '已加书签' : '当前页书签'}</span>
+          <span>{hasCurrentBookmark ? t('reader.bookmarked') : t('reader.currentBookmark')}</span>
         </button>
         <div className="settings-anchor" ref={settingsAnchorRef}>
           <button
@@ -116,7 +119,7 @@ export function ReaderHeader({
             onClick={onSettingsToggle}
           >
             <Settings aria-hidden="true" size={18} strokeWidth={1.7} />
-            <span>阅读设置</span>
+            <span>{t('reader.settings')}</span>
           </button>
           {settingsOpen ? (
             <ReaderSettings

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import ePub from 'epubjs'
 import type { BookSearchResult } from '../../../components/reader/BookSearchPanel'
 import type { TocItem } from '../../../types/book'
@@ -12,6 +13,7 @@ interface SearchProgress {
 }
 
 export function useEpubSearch(bookId: string, toc: TocItem[]) {
+  const { t } = useTranslation()
   const sourceRef = useRef<{ bookId: string; data: ArrayBuffer } | undefined>(
     undefined,
   )
@@ -40,7 +42,7 @@ export function useEpubSearch(bookId: string, toc: TocItem[]) {
   ): Promise<BookSearchResult[]> {
     const source = sourceRef.current
     if (!source || source.bookId !== bookId) {
-      throw new Error('书籍正文尚未准备好，请稍后重试。')
+      throw new Error(t('errors.readingNotReady'))
     }
 
     if (searchBookRef.current?.bookId !== bookId) {
@@ -62,7 +64,9 @@ export function useEpubSearch(bookId: string, toc: TocItem[]) {
       const section = sections[index]
       await section.load(searchBook.load.bind(searchBook))
       try {
-        const chapter = findChapterLabel(toc, section.href) ?? `第 ${index + 1} 节`
+        const chapter =
+          findChapterLabel(toc, section.href) ??
+          t('errors.chapterFallback', { count: index + 1 })
         findSectionMatches(section, query).forEach((match) => {
           results.push({
             cfi: match.cfi,

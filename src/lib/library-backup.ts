@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import i18n from '../i18n'
 import {
   getLibraryBackupConflicts,
   getLibraryBackupEntries,
@@ -61,7 +62,7 @@ function readRequiredString(
 ): string {
   const field = value[key]
   if (typeof field !== 'string' || !field.trim()) {
-    throw new Error('备份中的书籍信息不完整。')
+    throw new Error(i18n.t('dataErrors.backupBookInvalid'))
   }
   return field
 }
@@ -73,7 +74,7 @@ function readOptionalString(
   const field = value[key]
   if (field === undefined) return undefined
   if (typeof field !== 'string') {
-    throw new Error('备份中的书籍信息不完整。')
+    throw new Error(i18n.t('dataErrors.backupBookInvalid'))
   }
   return field
 }
@@ -84,7 +85,7 @@ function readRequiredNumber(
 ): number {
   const field = value[key]
   if (typeof field !== 'number' || !Number.isFinite(field)) {
-    throw new Error('备份中的书籍信息不完整。')
+    throw new Error(i18n.t('dataErrors.backupBookInvalid'))
   }
   return field
 }
@@ -96,7 +97,7 @@ function readOptionalNumber(
   const field = value[key]
   if (field === undefined) return undefined
   if (typeof field !== 'number' || !Number.isFinite(field)) {
-    throw new Error('备份中的书籍信息不完整。')
+    throw new Error(i18n.t('dataErrors.backupBookInvalid'))
   }
   return field
 }
@@ -108,7 +109,7 @@ function readOptionalBoolean(
   const field = value[key]
   if (field === undefined) return undefined
   if (typeof field !== 'boolean') {
-    throw new Error('备份中的书籍信息不完整。')
+    throw new Error(i18n.t('dataErrors.backupBookInvalid'))
   }
   return field
 }
@@ -128,17 +129,19 @@ function readOptionalTags(
         tag.length > MAX_BOOK_TAG_LENGTH,
     )
   ) {
-    throw new Error('备份中的书籍标签无效。')
+    throw new Error(i18n.t('dataErrors.backupTagsInvalid'))
   }
   return normalizeBookTags(field)
 }
 
 function parseBookRecord(value: unknown): BookRecord {
-  if (!isObject(value)) throw new Error('备份中的书籍信息不完整。')
+  if (!isObject(value)) {
+    throw new Error(i18n.t('dataErrors.backupBookInvalid'))
+  }
 
   const progress = readRequiredNumber(value, 'progress')
   if (progress < 0 || progress > 1) {
-    throw new Error('备份中的阅读进度无效。')
+    throw new Error(i18n.t('dataErrors.backupProgressInvalid'))
   }
   const readingStatus = readOptionalString(value, 'readingStatus')
   if (
@@ -147,7 +150,7 @@ function parseBookRecord(value: unknown): BookRecord {
       readingStatus as (typeof BOOK_READING_STATUSES)[number],
     )
   ) {
-    throw new Error('备份中的阅读状态无效。')
+    throw new Error(i18n.t('dataErrors.backupStatusInvalid'))
   }
 
   return {
@@ -171,28 +174,30 @@ function parseBookRecord(value: unknown): BookRecord {
 
 function parseManifest(value: unknown): BackupManifest {
   if (!isObject(value) || value.format !== BACKUP_FORMAT) {
-    throw new Error('这不是卷舍书库备份。')
+    throw new Error(i18n.t('dataErrors.notLentoBackup'))
   }
   if (value.version !== BACKUP_VERSION) {
-    throw new Error('这个备份版本暂不受支持。')
+    throw new Error(i18n.t('dataErrors.backupVersionUnsupported'))
   }
   if (!Array.isArray(value.books) || value.books.length === 0) {
-    throw new Error('备份中没有可以恢复的书籍。')
+    throw new Error(i18n.t('dataErrors.backupEmpty'))
   }
   if (value.books.length > MAX_BACKUP_BOOKS) {
-    throw new Error('备份中的书籍数量过多。')
+    throw new Error(i18n.t('dataErrors.backupTooMany'))
   }
 
   const seenIds = new Set<string>()
   const books = value.books.map((entry) => {
-    if (!isObject(entry)) throw new Error('备份中的书籍信息不完整。')
+    if (!isObject(entry)) {
+      throw new Error(i18n.t('dataErrors.backupBookInvalid'))
+    }
     const record = parseBookRecord(entry.record)
     const file = readRequiredString(entry, 'file')
     if (!/^books\/[a-z0-9-]+\.epub$/i.test(file)) {
-      throw new Error('备份中的书籍文件路径无效。')
+      throw new Error(i18n.t('dataErrors.backupPathInvalid'))
     }
     if (seenIds.has(record.id)) {
-      throw new Error('备份中包含重复的书籍。')
+      throw new Error(i18n.t('dataErrors.backupDuplicate'))
     }
     seenIds.add(record.id)
     return { record, file }
@@ -221,7 +226,9 @@ function downloadBlob(blob: Blob, fileName: string): void {
 
 export async function exportLibraryBackup(): Promise<LibraryBackupResult> {
   const entries = await getLibraryBackupEntries()
-  if (entries.length === 0) throw new Error('书架里还没有可以备份的书。')
+  if (entries.length === 0) {
+    throw new Error(i18n.t('dataErrors.libraryEmpty'))
+  }
 
   const zip = new JSZip()
   const books: BackupBookEntry[] = entries.map(({ book, data }, index) => {
@@ -255,27 +262,35 @@ export async function previewLibraryBackup(
   try {
     zip = await JSZip.loadAsync(file)
   } catch {
-    throw new Error('无法打开这个书库备份。')
+    throw new Error(i18n.t('dataErrors.backupOpenFailed'))
   }
 
   const manifestFile = zip.file(MANIFEST_FILE_NAME)
-  if (!manifestFile) throw new Error('备份中缺少书库信息。')
+  if (!manifestFile) {
+    throw new Error(i18n.t('dataErrors.backupManifestMissing'))
+  }
 
   let manifestValue: unknown
   try {
     manifestValue = JSON.parse(await manifestFile.async('string'))
   } catch {
-    throw new Error('备份中的书库信息已经损坏。')
+    throw new Error(i18n.t('dataErrors.backupManifestCorrupt'))
   }
   const manifest = parseManifest(manifestValue)
 
   const entries = await Promise.all(
     manifest.books.map(async ({ record, file: filePath }) => {
       const bookFile = zip.file(filePath)
-      if (!bookFile) throw new Error(`《${record.title}》的书籍文件缺失。`)
+      if (!bookFile) {
+        throw new Error(
+          i18n.t('dataErrors.backupFileMissing', { title: record.title }),
+        )
+      }
       const data = await bookFile.async('arraybuffer')
       if (data.byteLength === 0) {
-        throw new Error(`《${record.title}》的书籍文件为空。`)
+        throw new Error(
+          i18n.t('dataErrors.backupFileEmpty', { title: record.title }),
+        )
       }
       const fingerprint = await createBookFingerprint(data)
       return {

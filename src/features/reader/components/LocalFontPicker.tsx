@@ -1,5 +1,6 @@
 import { useDeferredValue, useState } from 'react'
 import { Search } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   getReadableLocalFontName,
   getReaderFontFamily,
@@ -20,6 +21,7 @@ export function LocalFontPicker({
   selectedFont,
   onSelect,
 }: LocalFontPickerProps) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [visibleCount, setVisibleCount] = useState(LOCAL_FONT_PAGE_SIZE)
   const deferredQuery = useDeferredValue(query.trim().toLocaleLowerCase())
@@ -34,18 +36,18 @@ export function LocalFontPicker({
     <div className="local-font-picker">
       <label className="local-font-search">
         <Search aria-hidden="true" size={14} strokeWidth={1.6} />
-        <span className="visually-hidden">搜索系统字体</span>
+        <span className="visually-hidden">{t('reader.settingsPanel.systemFontSearch')}</span>
         <input
           type="search"
           value={query}
-          placeholder="搜索系统字体"
+          placeholder={t('reader.settingsPanel.systemFontSearch')}
           onChange={(event) => {
             setQuery(event.target.value)
             setVisibleCount(LOCAL_FONT_PAGE_SIZE)
           }}
         />
       </label>
-      <div className="local-font-list" role="listbox" aria-label="系统字体样张">
+      <div className="local-font-list" role="listbox" aria-label={t('reader.settingsPanel.systemFontSamples')}>
         {visibleFonts.length > 0 ? (
           visibleFonts.map((family) => {
             const readableName = getReadableLocalFontName(family)
@@ -83,12 +85,12 @@ export function LocalFontPicker({
             )
           })
         ) : (
-          <span className="local-font-empty">没有匹配的字体</span>
+          <span className="local-font-empty">{t('reader.settingsPanel.noMatchingFonts')}</span>
         )}
       </div>
       <div className="local-font-list-footer">
         <span>
-          已显示 {visibleFonts.length} / {matchingFonts.length}
+          {t('reader.settingsPanel.shownFonts', { visible: visibleFonts.length, total: matchingFonts.length })}
         </span>
         {visibleFonts.length < matchingFonts.length ? (
           <button
@@ -97,7 +99,7 @@ export function LocalFontPicker({
               setVisibleCount((count) => count + LOCAL_FONT_PAGE_SIZE)
             }
           >
-            继续显示
+            {t('reader.settingsPanel.showMore')}
           </button>
         ) : null}
       </div>

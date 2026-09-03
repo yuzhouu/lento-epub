@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   BookOpen,
   Download,
@@ -8,7 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import {
-  BOOK_READING_STATUS_LABELS,
+  BOOK_READING_STATUS_KEYS,
   BOOK_READING_STATUSES,
   getBookReadingStatus,
   MAX_BOOK_TAG_LENGTH,
@@ -34,6 +35,7 @@ export function BookDetailsSidebar({
   onClose,
   onUpdate,
 }: BookDetailsSidebarProps) {
+  const { t } = useTranslation()
   const [tagDraft, setTagDraft] = useState('')
   const [tagError, setTagError] = useState<string>()
   const [isUpdating, setIsUpdating] = useState(false)
@@ -68,14 +70,14 @@ export function BookDetailsSidebar({
         setReadingAssetsError(
           loadError instanceof Error
             ? loadError.message
-            : '读取这本书的阅读记录失败。',
+            : t('library.details.loadRecordsFailed'),
         )
       })
 
     return () => {
       cancelled = true
     }
-  }, [book.id])
+  }, [book.id, t])
 
   async function saveOrganization(
     patch: BookOrganizationPatch,
@@ -96,15 +98,15 @@ export function BookDetailsSidebar({
     event.preventDefault()
     const tag = normalizeTag(tagDraft)
     if (!tag) {
-      setTagError('请输入标签名称。')
+      setTagError(t('library.details.tagRequired'))
       return
     }
     if (tag.length > MAX_BOOK_TAG_LENGTH) {
-      setTagError(`标签最多 ${MAX_BOOK_TAG_LENGTH} 个字。`)
+      setTagError(t('library.details.tagTooLong', { count: MAX_BOOK_TAG_LENGTH }))
       return
     }
     if (tags.length >= MAX_BOOK_TAGS) {
-      setTagError(`每本书最多 ${MAX_BOOK_TAGS} 个标签。`)
+      setTagError(t('library.details.tooManyTags', { count: MAX_BOOK_TAGS }))
       return
     }
     if (
@@ -114,7 +116,7 @@ export function BookDetailsSidebar({
           tag.toLocaleLowerCase('zh-CN'),
       )
     ) {
-      setTagError('这本书已有该标签。')
+      setTagError(t('library.details.duplicateTag'))
       return
     }
 
@@ -142,7 +144,7 @@ export function BookDetailsSidebar({
       setReadingAssetsError(
         exportError instanceof Error
           ? exportError.message
-          : '导出阅读记录失败。',
+          : t('library.details.exportRecordsFailed'),
       )
     } finally {
       setExportingFormat(undefined)
@@ -154,7 +156,7 @@ export function BookDetailsSidebar({
       <button
         className="book-sidebar-scrim"
         type="button"
-        aria-label="关闭书籍信息"
+        aria-label={t('library.details.close')}
         onClick={onClose}
       />
       <aside
@@ -164,10 +166,10 @@ export function BookDetailsSidebar({
       >
         <header className="book-details-heading">
           <div>
-            <span>书籍信息</span>
-            <h2 id="book-details-title">管理这本书</h2>
+            <span>{t('library.details.eyebrow')}</span>
+            <h2 id="book-details-title">{t('library.details.title')}</h2>
           </div>
-          <button type="button" aria-label="关闭书籍信息" onClick={onClose}>
+          <button type="button" aria-label={t('library.details.close')} onClick={onClose}>
             <PanelRightClose aria-hidden="true" size={18} strokeWidth={1.6} />
           </button>
         </header>
@@ -183,13 +185,13 @@ export function BookDetailsSidebar({
           <div>
             <h3>{book.title}</h3>
             <p>{book.author}</p>
-            <span>已阅读 {Math.round(book.progress * 100)}%</span>
+            <span>{t('library.details.readProgress', { percent: Math.round(book.progress * 100) })}</span>
           </div>
         </div>
 
         <section className="book-details-section" aria-labelledby="book-status-title">
           <div className="book-details-section-heading">
-            <h3 id="book-status-title">阅读状态</h3>
+            <h3 id="book-status-title">{t('library.details.status')}</h3>
           </div>
           <div className="book-sidebar-status-options">
             {BOOK_READING_STATUSES.map((status) => (
@@ -203,7 +205,7 @@ export function BookDetailsSidebar({
                   void saveOrganization({ readingStatus: status })
                 }
               >
-                {BOOK_READING_STATUS_LABELS[status]}
+                {t(BOOK_READING_STATUS_KEYS[status])}
               </button>
             ))}
           </div>
@@ -214,7 +216,7 @@ export function BookDetailsSidebar({
           aria-labelledby="book-favorite-title"
         >
           <div className="book-details-section-heading">
-            <h3 id="book-favorite-title">收藏</h3>
+            <h3 id="book-favorite-title">{t('common.favorite')}</h3>
           </div>
           <button
             className={`book-sidebar-favorite${
@@ -234,8 +236,8 @@ export function BookDetailsSidebar({
               fill={book.isFavorite ? 'currentColor' : 'none'}
             />
             <span>
-              <strong>{book.isFavorite ? '已收藏' : '加入收藏'}</strong>
-              <small>在书架中快速筛选这本书</small>
+              <strong>{book.isFavorite ? t('library.book.favorited') : t('library.details.addFavorite')}</strong>
+              <small>{t('library.details.favoriteHint')}</small>
             </span>
           </button>
         </section>
@@ -245,32 +247,32 @@ export function BookDetailsSidebar({
           aria-labelledby="book-reading-assets-title"
         >
           <div className="book-details-section-heading">
-            <h3 id="book-reading-assets-title">导出阅读记录</h3>
+            <h3 id="book-reading-assets-title">{t('library.details.exportTitle')}</h3>
             <span>
               {readingAssets
-                ? `${readingAssets.length} 条`
+                ? t('library.details.records', { count: readingAssets.length })
                 : readingAssetsError
-                  ? '读取失败'
-                  : '读取中…'}
+                  ? t('common.loadFailed')
+                  : t('common.loading')}
             </span>
           </div>
           <p className="book-sidebar-export-summary">
             {readingAssets?.length
-              ? `${bookmarkCount} 个书签 · ${highlightCount} 条划线与笔记`
+              ? t('library.details.exportSummary', { bookmarks: bookmarkCount, highlights: highlightCount })
               : readingAssets
-                ? '这本书还没有书签、划线或笔记。'
+                ? t('library.details.noRecords')
                 : readingAssetsError
-                  ? '暂时无法读取这本书的阅读记录。'
-                  : '正在整理这本书的书签、划线与笔记。'}
+                  ? t('library.details.recordsUnavailable')
+                  : t('library.details.preparingRecords')}
           </p>
-          <div className="book-sidebar-export-actions" aria-label="导出格式">
+          <div className="book-sidebar-export-actions" aria-label={t('library.details.exportFormat')}>
             <button
               type="button"
               disabled={!readingAssets?.length || Boolean(exportingFormat)}
               onClick={() => void handleExport('markdown')}
             >
               <Download aria-hidden="true" size={14} strokeWidth={1.7} />
-              {exportingFormat === 'markdown' ? '正在导出…' : 'Markdown'}
+              {exportingFormat === 'markdown' ? t('library.details.exporting') : 'Markdown'}
             </button>
             <button
               type="button"
@@ -278,7 +280,7 @@ export function BookDetailsSidebar({
               onClick={() => void handleExport('text')}
             >
               <Download aria-hidden="true" size={14} strokeWidth={1.7} />
-              {exportingFormat === 'text' ? '正在导出…' : '纯文本'}
+              {exportingFormat === 'text' ? t('library.details.exporting') : t('library.details.plainText')}
             </button>
           </div>
           {readingAssetsError ? (
@@ -293,7 +295,7 @@ export function BookDetailsSidebar({
           aria-labelledby="book-tags-title"
         >
           <div className="book-details-section-heading">
-            <h3 id="book-tags-title">标签</h3>
+            <h3 id="book-tags-title">{t('library.details.tags')}</h3>
             <span>
               {tags.length} / {MAX_BOOK_TAGS}
             </span>
@@ -306,7 +308,7 @@ export function BookDetailsSidebar({
                   {tag}
                   <button
                     type="button"
-                    aria-label={`移除标签 ${tag}`}
+                    aria-label={t('library.details.removeTag', { tag })}
                     disabled={isUpdating}
                     onClick={() => void handleRemoveTag(tag)}
                   >
@@ -317,7 +319,7 @@ export function BookDetailsSidebar({
             </div>
           ) : (
             <p className="book-sidebar-tags-empty">
-              添加标签，之后可以从书架顶部快速筛选。
+              {t('library.details.noTags')}
             </p>
           )}
 
@@ -329,8 +331,8 @@ export function BookDetailsSidebar({
               type="text"
               value={tagDraft}
               maxLength={MAX_BOOK_TAG_LENGTH + 1}
-              placeholder="输入新标签"
-              aria-label={`为《${book.title}》添加标签`}
+              placeholder={t('library.details.newTag')}
+              aria-label={t('library.details.addTagLabel', { title: book.title })}
               disabled={isUpdating || tags.length >= MAX_BOOK_TAGS}
               onChange={(event) => {
                 setTagDraft(event.target.value)
@@ -342,7 +344,7 @@ export function BookDetailsSidebar({
               disabled={isUpdating || tags.length >= MAX_BOOK_TAGS}
             >
               <Plus aria-hidden="true" size={14} strokeWidth={1.8} />
-              添加
+              {t('common.add')}
             </button>
           </form>
           {tagError ? (
@@ -351,7 +353,7 @@ export function BookDetailsSidebar({
             </p>
           ) : null}
           <p className="book-sidebar-tag-limit">
-            每个标签最多 {MAX_BOOK_TAG_LENGTH} 个字
+            {t('library.details.tagLimit', { count: MAX_BOOK_TAG_LENGTH })}
           </p>
         </section>
       </aside>

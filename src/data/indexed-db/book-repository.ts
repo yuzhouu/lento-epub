@@ -1,3 +1,4 @@
+import i18n from '../../i18n'
 import type {
   BookFileRecord,
   BookRecord,
@@ -111,7 +112,9 @@ export async function getBookFileEntries(): Promise<LibraryBackupEntry[]> {
   const filesById = new Map(files.map((file) => [file.id, file.data]))
   return books.map((book) => {
     const data = filesById.get(book.id)
-    if (!data) throw new Error(`《${book.title}》的书籍文件已经丢失。`)
+    if (!data) {
+      throw new Error(i18n.t('dataErrors.bookFileMissing', { title: book.title }))
+    }
     return { book: { ...book, fileSize: data.byteLength }, data }
   })
 }
@@ -250,13 +253,15 @@ export async function deleteBook(
 export async function restoreDeletedBook(
   entry: DeletedBookEntry,
 ): Promise<void> {
-  if (!entry.data) throw new Error('这本书的 EPUB 文件已经无法恢复。')
+  if (!entry.data) throw new Error(i18n.t('dataErrors.restoreFileMissing'))
 
   const fingerprint =
     entry.book.fingerprint ?? (await createBookFingerprint(entry.data))
   const existingBook = (await getStoredFingerprintMap()).get(fingerprint)
   if (existingBook && existingBook.id !== entry.book.id) {
-    throw new Error(`书架中已有《${existingBook.title}》，无法撤销删除。`)
+    throw new Error(
+      i18n.t('dataErrors.restoreDuplicate', { title: existingBook.title }),
+    )
   }
 
   const database = await openDatabase()

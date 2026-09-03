@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   saveReadingAsset,
   updateReadingHighlight,
@@ -55,6 +56,7 @@ export function ReaderPage({
   onBack,
   onBookUpdate,
 }: ReaderPageProps) {
+  const { t } = useTranslation()
   const preferences = useReaderPreferences()
   const {
     font,
@@ -463,7 +465,7 @@ export function ReaderPage({
           note,
           text: selection.text,
         })
-        if (!updated) throw new Error('这条划线已经不存在。')
+        if (!updated) throw new Error(t('errors.assetMissing'))
         pendingExistingHighlightRef.current = updated
         if (renditionRef.current) {
           renditionRef.current.annotations.remove(existing.cfi, 'highlight')
@@ -532,7 +534,7 @@ export function ReaderPage({
       closePendingSelectionAfterSaveRef.current = false
       if (selectionVersion === pendingSelectionVersionRef.current) {
         setReadingAssetError(
-          saveError instanceof Error ? saveError.message : '保存划线失败。',
+          saveError instanceof Error ? saveError.message : t('errors.saveHighlight'),
         )
       }
     } finally {
@@ -575,7 +577,7 @@ export function ReaderPage({
 
     try {
       const updated = await updateReadingHighlight(existing.id, { lineStyle })
-      if (!updated) throw new Error('这条划线已经不存在。')
+      if (!updated) throw new Error(t('errors.assetMissing'))
       pendingExistingHighlightRef.current = updated
       setReadingAssets((current) =>
         current.map((asset) => (asset.id === updated.id ? updated : asset)),
@@ -594,7 +596,7 @@ export function ReaderPage({
       setReadingAssetError(
         updateError instanceof Error
           ? updateError.message
-          : '更新划线样式失败。',
+          : t('errors.updateHighlightStyle'),
       )
     } finally {
       isSavingSelectionRef.current = false
@@ -772,7 +774,7 @@ export function ReaderPage({
             <button
               className="toc-backdrop"
               type="button"
-              aria-label="关闭书内导航"
+              aria-label={t('reader.closeNavigation')}
               onClick={() => setTocOpen(false)}
             />
           </>

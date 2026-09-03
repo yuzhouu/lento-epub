@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AboutPage } from './components/about/AboutPage'
 import { LibraryPage } from './components/library/LibraryPage'
 import { useBookImport } from './components/library/ImportBookButton'
@@ -44,6 +45,7 @@ function getRouteFromHash(): AppRoute {
 }
 
 export function App() {
+  const { t } = useTranslation()
   const [books, setBooks] = useState<BookRecord[]>([])
   const [route, setRoute] = useState<AppRoute>(getRouteFromHash)
   const [isLoading, setIsLoading] = useState(true)
@@ -82,11 +84,11 @@ export function App() {
   useEffect(() => {
     document.title =
       route.page === 'about'
-        ? '关于 · 卷舍 Lento'
+        ? t('app.aboutTitle')
         : route.page === 'privacy'
-          ? '隐私政策 · 卷舍 Lento'
-          : '卷舍 · Lento'
-  }, [route.page])
+          ? t('app.privacyTitle')
+          : t('app.homeTitle')
+  }, [route.page, t])
 
   useEffect(() => {
     if (__LENTO_BUILD_TARGET__ !== 'web' || isLoading) return
@@ -122,7 +124,7 @@ export function App() {
     patch: BookOrganizationPatch,
   ): Promise<void> {
     const updatedBook = await updateBookOrganization(id, patch)
-    if (!updatedBook) throw new Error('找不到这本书。')
+    if (!updatedBook) throw new Error(t('errors.bookNotFound'))
     handleBookUpdate(updatedBook)
   }
 
@@ -144,7 +146,7 @@ export function App() {
   if (isLoading) {
     return (
       <main className="loading-screen">
-        <span>卷舍 · Lento</span>
+        <span>{t('common.brand')}</span>
       </main>
     )
   }
@@ -162,7 +164,7 @@ export function App() {
       <Suspense
         fallback={
           <main className="loading-screen">
-            <span>正在翻开…</span>
+            <span>{t('app.opening')}</span>
           </main>
         }
       >

@@ -1,4 +1,5 @@
 import ePub from 'epubjs'
+import i18n from '../i18n'
 import {
   saveImportedBooks,
   type ImportedBookEntry,
@@ -57,7 +58,7 @@ async function prepareEpub(
   addedAt: number,
 ): Promise<ImportedBookEntry> {
   if (!EPUB_FILE_PATTERN.test(file.name)) {
-    throw new Error('不是 EPUB 文件。')
+    throw new Error(i18n.t('dataErrors.notEpub'))
   }
 
   const data = await file.arrayBuffer()
@@ -71,7 +72,7 @@ async function prepareEpub(
       createBookFingerprint(data),
     ])
     const title = metadata.title?.trim() || stripExtension(file.name)
-    const author = metadata.creator?.trim() || '未知作者'
+    const author = metadata.creator?.trim() || i18n.t('dataErrors.unknownAuthor')
     const book: BookRecord & { fingerprint: string } = {
       id: crypto.randomUUID(),
       title,
@@ -91,8 +92,8 @@ async function prepareEpub(
   } catch (error) {
     throw new Error(
       error instanceof Error && error.message
-        ? `无法读取这本 EPUB：${error.message}`
-        : '无法读取这本 EPUB。',
+        ? i18n.t('dataErrors.readEpubDetail', { message: error.message })
+        : i18n.t('dataErrors.readEpub'),
     )
   } finally {
     epubBook.destroy()
@@ -116,7 +117,7 @@ export async function importEpubFiles(
           failure: {
             fileName: file.name,
             message:
-              error instanceof Error ? error.message : '无法读取这本 EPUB。',
+              error instanceof Error ? error.message : i18n.t('dataErrors.readEpub'),
           },
         }
       }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   List,
@@ -45,6 +46,7 @@ export function ReadingAssetsPanel({
   onShowToc,
   onUpdateHighlight,
 }: ReadingAssetsPanelProps) {
+  const { t } = useTranslation()
   const [filter, setFilter] = useState<'all' | ReadingAsset['kind']>('all')
   const [busyAssetId, setBusyAssetId] = useState<string>()
   const activeAssetElementRef = useRef<HTMLLIElement>(null)
@@ -110,28 +112,28 @@ export function ReadingAssetsPanel({
   return (
     <aside
       className="toc-panel reading-assets-panel"
-      aria-label={`《${book.title}》的书签、划线和笔记`}
+      aria-label={t('reader.assets.panelLabel', { title: book.title })}
     >
       <div className="toc-header">
-        <strong>卷舍</strong>
+        <strong>{t('common.brandShort')}</strong>
         <button className="sidebar-toggle" type="button" onClick={onClose}>
           <PanelLeftClose aria-hidden="true" size={19} strokeWidth={1.7} />
-          <span className="visually-hidden">关闭书摘</span>
+          <span className="visually-hidden">{t('reader.assets.close')}</span>
         </button>
       </div>
 
-      <div className="navigation-tabs has-three" aria-label="书内导航">
+      <div className="navigation-tabs has-three" aria-label={t('reader.navigation')}>
         <button type="button" onClick={onShowToc}>
           <List aria-hidden="true" size={15} strokeWidth={1.7} />
-          目录
+          {t('common.toc')}
         </button>
         <button type="button" onClick={onShowSearch}>
           <Search aria-hidden="true" size={15} strokeWidth={1.7} />
-          搜索
+          {t('common.search')}
         </button>
         <button className="is-active" type="button" aria-current="page">
           <NotebookPen aria-hidden="true" size={15} strokeWidth={1.7} />
-          书摘
+          {t('common.excerpts')}
         </button>
       </div>
 
@@ -142,27 +144,27 @@ export function ReadingAssetsPanel({
           </p>
         ) : null}
 
-        <div className="reading-assets-filters" aria-label="筛选阅读记录">
+        <div className="reading-assets-filters" aria-label={t('reader.assets.filters')}>
           <button
             className={filter === 'all' ? 'is-active' : ''}
             type="button"
             onClick={() => setFilter('all')}
           >
-            全部 {assets.length}
+            {t('common.all')} {assets.length}
           </button>
           <button
             className={filter === 'bookmark' ? 'is-active' : ''}
             type="button"
             onClick={() => setFilter('bookmark')}
           >
-            书签 {bookmarkCount}
+            {t('reader.assets.bookmarks', { count: bookmarkCount })}
           </button>
           <button
             className={filter === 'highlight' ? 'is-active' : ''}
             type="button"
             onClick={() => setFilter('highlight')}
           >
-            划线 {highlightCount}
+            {t('reader.assets.highlights', { count: highlightCount })}
           </button>
         </div>
 
@@ -192,8 +194,8 @@ export function ReadingAssetsPanel({
         ) : (
           <div className="reading-assets-empty">
             <NotebookPen aria-hidden="true" size={24} strokeWidth={1.35} />
-            <strong>{assets.length === 0 ? '还没有留下阅读记录' : '没有这一类记录'}</strong>
-            <span>在正文中选中文字即可划线和批注。</span>
+            <strong>{assets.length === 0 ? t('reader.assets.empty') : t('reader.assets.filteredEmpty')}</strong>
+            <span>{t('reader.assets.emptyHint')}</span>
           </div>
         )}
       </div>
@@ -201,7 +203,7 @@ export function ReadingAssetsPanel({
       <div className="toc-footer">
         <button type="button" onClick={onBack}>
           <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.7} />
-          返回书架
+          {t('common.backToLibrary')}
         </button>
       </div>
     </aside>

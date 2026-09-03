@@ -72,3 +72,41 @@ button:focus-visible,
   font-size: 28px;
   letter-spacing: 0.03em;
 }
+
+.language-switcher {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 13px;
+}
+
+.language-switcher select {
+  min-width: 86px;
+  border: 0;
+  outline: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.language-switcher:focus-within {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+
+.language-switcher.is-compact {
+  min-height: 34px;
+  padding: 0 7px;
+  border-color: var(--reader-border, var(--line));
+  color: inherit;
+}
+
+.language-switcher.is-compact select {
+  min-width: 96px;
+}

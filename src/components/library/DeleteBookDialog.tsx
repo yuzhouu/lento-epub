@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { BookRecord } from '../../types/book'
 
 interface DeleteBookDialogProps {
@@ -14,6 +15,7 @@ export function DeleteBookDialog({
   onCancel,
   onConfirm,
 }: DeleteBookDialogProps) {
+  const { t } = useTranslation()
   const dialogRef = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
@@ -38,10 +40,9 @@ export function DeleteBookDialog({
         if (event.target === event.currentTarget && !isDeleting) onCancel()
       }}
     >
-      <h2 id="delete-book-title">删除这本书？</h2>
+      <h2 id="delete-book-title">{t('library.deleteDialog.title')}</h2>
       <p id="delete-book-description">
-        将从这台设备删除《{book.title}》、EPUB 文件和阅读进度。删除后 8
-        秒内可以撤销。
+        {t('library.deleteDialog.description', { title: book.title })}
       </p>
       <div className="delete-dialog-actions">
         <button
@@ -51,7 +52,7 @@ export function DeleteBookDialog({
           disabled={isDeleting}
           onClick={onCancel}
         >
-          取消
+          {t('common.cancel')}
         </button>
         <button
           className="danger-button"
@@ -59,7 +60,9 @@ export function DeleteBookDialog({
           disabled={isDeleting}
           onClick={onConfirm}
         >
-          {isDeleting ? '正在删除…' : '删除书籍'}
+          {isDeleting
+            ? t('library.deleteDialog.deleting')
+            : t('library.deleteDialog.confirm')}
         </button>
       </div>
     </dialog>

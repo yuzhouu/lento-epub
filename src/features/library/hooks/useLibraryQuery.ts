@@ -10,10 +10,10 @@ import {
 
 export type { LibrarySort, ReadingStatusFilter } from '../model/library-query'
 
-export const LIBRARY_SORT_LABELS: Record<LibrarySort, string> = {
-  recent: '最近阅读',
-  added: '添加时间',
-  progress: '阅读进度',
+export const LIBRARY_SORT_KEYS: Record<LibrarySort, string> = {
+  recent: 'library.toolbar.sortRecent',
+  added: 'library.toolbar.sortAdded',
+  progress: 'library.toolbar.sortProgress',
 }
 
 export const READING_STATUS_FILTERS: readonly ReadingStatusFilter[] = [

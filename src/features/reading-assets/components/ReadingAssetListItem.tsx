@@ -1,5 +1,7 @@
 import { useState, type Ref } from 'react'
 import { Bookmark, Highlighter, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { getCurrentLanguage } from '../../../i18n'
 import type {
   ReadingAsset,
   ReadingHighlight,
@@ -23,7 +25,7 @@ interface ReadingAssetListItemProps {
 }
 
 function formatAssetDate(timestamp: number): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(getCurrentLanguage(), {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -40,6 +42,7 @@ export function ReadingAssetListItem({
   onSelect,
   onUpdateHighlight,
 }: ReadingAssetListItemProps) {
+  const { t } = useTranslation()
   const [editingNote, setEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
 
@@ -71,7 +74,7 @@ export function ReadingAssetListItem({
           ) : (
             <Highlighter aria-hidden="true" size={15} strokeWidth={1.6} />
           )}
-          <span>{asset.chapterLabel || '未标注章节'}</span>
+          <span>{asset.chapterLabel || t('reader.assets.unknownChapter')}</span>
           <time dateTime={new Date(asset.createdAt).toISOString()}>
             {formatAssetDate(asset.createdAt)}
           </time>
@@ -105,19 +108,19 @@ export function ReadingAssetListItem({
                   maxLength={2000}
                   rows={4}
                   autoFocus
-                  placeholder="写下这段文字带来的想法…"
+                  placeholder={t('reader.assets.notePlaceholder')}
                   onChange={(event) => setNoteDraft(event.target.value)}
                 />
                 <div>
                   <button type="button" onClick={() => setEditingNote(false)}>
-                    取消
+                    {t('common.cancel')}
                   </button>
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => void saveNote()}
                   >
-                    保存批注
+                    {t('reader.assets.saveNote')}
                   </button>
                 </div>
               </div>
@@ -127,7 +130,7 @@ export function ReadingAssetListItem({
                 type="button"
                 onClick={beginEditingNote}
               >
-                <span>批注</span>
+                <span>{t('reader.assets.note')}</span>
                 {asset.note}
               </button>
             ) : (
@@ -136,7 +139,7 @@ export function ReadingAssetListItem({
                 type="button"
                 onClick={beginEditingNote}
               >
-                添加批注
+                {t('reader.assets.addNote')}
               </button>
             )}
           </>
@@ -145,7 +148,9 @@ export function ReadingAssetListItem({
         <button
           className="reading-asset-delete"
           type="button"
-          aria-label={`删除${asset.kind === 'bookmark' ? '书签' : '划线'}`}
+          aria-label={t('reader.assets.deleteAsset', {
+            kind: t(asset.kind === 'bookmark' ? 'reader.assets.bookmark' : 'reader.assets.highlight'),
+          })}
           disabled={busy}
           onClick={onDelete}
         >

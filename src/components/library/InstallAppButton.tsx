@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Download } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -7,6 +8,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export function InstallAppButton() {
+  const { t } = useTranslation()
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent>()
 
@@ -51,10 +53,10 @@ export function InstallAppButton() {
       className="secondary-button library-utility-button"
       type="button"
       onClick={() => void handleInstall()}
-      title="把卷舍安装到当前设备"
+      title={t('library.install.title')}
     >
       <Download aria-hidden="true" size={17} strokeWidth={1.7} />
-      <span>安装应用</span>
+      <span>{t('library.install.button')}</span>
     </button>
   )
 }

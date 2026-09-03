@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import i18n from '../../../i18n'
 import { createEpubFileLaunchBridge } from './epub-file-launch'
 
 function createHandle(file: File): FileSystemFileHandle {
@@ -42,7 +43,10 @@ describe('EPUB PWA file launches', () => {
     await bridge.handleLaunch(createParams([unreadableHandle]))
 
     expect(events).toEqual([
-      { kind: 'error', message: '无法读取“丢失.epub”。' },
+      {
+        kind: 'error',
+        message: i18n.t('dataErrors.launchRead', { name: '丢失.epub' }),
+      },
     ])
   })
 })

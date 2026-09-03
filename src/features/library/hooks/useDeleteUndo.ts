@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { LibraryAlertNotice } from '../../../components/library/LibraryAlert'
 import type {
   BookRecord,
@@ -18,6 +19,7 @@ export function useDeleteUndo({
   onNotice,
   onDeleted,
 }: UseDeleteUndoOptions) {
+  const { t } = useTranslation()
   const [bookToDelete, setBookToDelete] = useState<BookRecord>()
   const [isDeleting, setIsDeleting] = useState(false)
   const [deletedEntry, setDeletedEntry] = useState<DeletedBookEntry>()
@@ -41,14 +43,14 @@ export function useDeleteUndo({
       if (!deleted.data) {
         onNotice({
           kind: 'success',
-          message: `已删除《${deleted.book.title}》，原 EPUB 文件此前已丢失，无法撤销。`,
+          message: t('errors.deletedMissingFile', { title: deleted.book.title }),
         })
       }
     } catch (error) {
       setBookToDelete(undefined)
       onNotice({
         kind: 'error',
-        message: error instanceof Error ? error.message : '删除书籍失败。',
+        message: error instanceof Error ? error.message : t('errors.deleteBook'),
       })
     } finally {
       setIsDeleting(false)
@@ -63,12 +65,12 @@ export function useDeleteUndo({
       await onUndoDelete(entry)
       onNotice({
         kind: 'success',
-        message: `已恢复《${entry.book.title}》。`,
+        message: t('errors.restoredBook', { title: entry.book.title }),
       })
     } catch (error) {
       onNotice({
         kind: 'error',
-        message: error instanceof Error ? error.message : '撤销删除失败。',
+        message: error instanceof Error ? error.message : t('errors.undoDelete'),
       })
     }
   }

@@ -1,5 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
+import { getCurrentLanguage } from '../../i18n'
 import { getStorageErrorMessage } from '../../data/indexed-db/storage-capacity'
 import type { LibraryAlertNotice } from './LibraryAlert'
 import type { BookRecord } from '../../types/book'
@@ -14,30 +17,36 @@ export interface BookImportOptions {
   openSingle?: boolean
 }
 
-function describeImportResult(result: EpubImportResult): LibraryAlertNotice {
+function describeImportResult(
+  result: EpubImportResult,
+  t: TFunction,
+): LibraryAlertNotice {
   const importedCount = result.imported.length
   const duplicateCount = result.duplicates.length
   const failureCount = result.failures.length
   const parts: string[] = []
 
-  if (importedCount > 0) parts.push(`已添加 ${importedCount} 本书`)
-  if (duplicateCount > 0) parts.push(`跳过 ${duplicateCount} 本重复书`)
-  if (failureCount > 0) parts.push(`${failureCount} 个文件未能导入`)
+  if (importedCount > 0) parts.push(t('library.import.added', { count: importedCount }))
+  if (duplicateCount > 0) parts.push(t('library.import.duplicate', { count: duplicateCount }))
+  if (failureCount > 0) parts.push(t('library.import.failed', { count: failureCount }))
 
   const details = [
     ...result.duplicates.map(
       ({ fileName, existingTitle }) =>
-        `${fileName}：与《${existingTitle}》内容相同`,
+        t('library.import.duplicateDetail', { fileName, title: existingTitle }),
     ),
     ...result.failures.map(
-      ({ fileName, message }) => `${fileName}：${message}`,
+      ({ fileName, message }) => `${fileName}: ${message}`,
     ),
   ]
 
   return {
     kind: importedCount > 0 || duplicateCount > 0 ? 'success' : 'error',
-    message: `${parts.join('，')}。`,
-    detail: details.length > 0 ? details.slice(0, 3).join('；') : undefined,
+    message: new Intl.ListFormat(getCurrentLanguage(), {
+      style: 'short',
+      type: 'conjunction',
+    }).format(parts),
+    detail: details.length > 0 ? details.slice(0, 3).join(' · ') : undefined,
   }
 }
 
@@ -46,6 +55,7 @@ export function useBookImport(
   onAlert: (notice: LibraryAlertNotice | undefined) => void,
   onOpen: (id: string) => void,
 ): UseBookImportResult {
+  const { t } = useTranslation()
   const importQueueRef = useRef(Promise.resolve())
   const pendingImportCountRef = useRef(0)
   const [isImporting, setIsImporting] = useState(false)
@@ -62,7 +72,7 @@ export function useBookImport(
           const { importEpubFiles } = await import('../../lib/import-epub')
           const result = await importEpubFiles(files)
           if (result.imported.length > 0) onImported(result.imported)
-          onAlert(describeImportResult(result))
+          onAlert(describeImportResult(result, t))
 
           if (options?.openSingle && files.length === 1) {
             const bookId =
@@ -76,7 +86,7 @@ export function useBookImport(
               getStorageErrorMessage(importError) ??
               (importError instanceof Error
                 ? importError.message
-                : '添加书本失败。'),
+                : t('library.import.genericError')),
           })
         } finally {
           pendingImportCountRef.current -= 1
@@ -88,7 +98,7 @@ export function useBookImport(
       importQueueRef.current = queuedImport.catch(() => undefined)
       return queuedImport
     },
-    [onAlert, onImported, onOpen],
+    [onAlert, onImported, onOpen, t],
   )
 
   return {
@@ -108,6 +118,7 @@ export function ImportBookButton({
   isImporting,
   compact = false,
 }: ImportBookButtonProps) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
 
   function handleFiles(files: FileList | null) {
@@ -133,7 +144,7 @@ export function ImportBookButton({
         disabled={isImporting}
       >
         <Plus aria-hidden="true" size={19} strokeWidth={1.7} />
-        {isImporting ? '正在添加…' : '添加书本'}
+        {isImporting ? t('library.import.adding') : t('library.import.addBooks')}
       </button>
     </div>
   )

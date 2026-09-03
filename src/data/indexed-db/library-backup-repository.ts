@@ -1,3 +1,4 @@
+import i18n from '../../i18n'
 import type {
   BookFileRecord,
   BookRecord,
@@ -136,7 +137,9 @@ export async function restoreLibraryBackupEntries(
 
     const resolution = resolutions.get(entry.book.id)
     if (!resolution) {
-      throw new Error(`请先选择《${entry.book.title}》的恢复方式。`)
+      throw new Error(
+        i18n.t('dataErrors.resolutionRequired', { title: entry.book.title }),
+      )
     }
     if (resolution === 'skip') {
       skippedCount += 1

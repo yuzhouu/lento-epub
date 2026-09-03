@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   deleteReadingAsset,
   saveReadingAsset,
@@ -10,6 +11,7 @@ import type {
 } from '../../../types/book'
 
 export function useReadingAssets(bookId: string) {
+  const { t } = useTranslation()
   const [assets, setAssets] = useState<ReadingAsset[]>([])
   const [activeAssetId, setActiveAssetId] = useState<string>()
   const [activeAssetFocusVersion, setActiveAssetFocusVersion] = useState(0)
@@ -30,7 +32,7 @@ export function useReadingAssets(bookId: string) {
       setAssets((current) => [saved, ...current])
       return saved
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '保存阅读记录失败。')
+      setError(saveError instanceof Error ? saveError.message : t('errors.saveReadingAsset'))
       return undefined
     }
   }
@@ -42,13 +44,13 @@ export function useReadingAssets(bookId: string) {
     setError(undefined)
     try {
       const updated = await updateReadingHighlight(highlight.id, patch)
-      if (!updated) throw new Error('这条划线已经不存在。')
+      if (!updated) throw new Error(t('errors.assetMissing'))
       setAssets((current) =>
         current.map((asset) => (asset.id === updated.id ? updated : asset)),
       )
       return updated
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : '更新划线失败。')
+      setError(updateError instanceof Error ? updateError.message : t('errors.updateHighlight'))
       return undefined
     }
   }
@@ -68,7 +70,7 @@ export function useReadingAssets(bookId: string) {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : '删除阅读记录失败。',
+          : t('errors.deleteReadingAsset'),
       )
       return false
     }
@@ -97,7 +99,7 @@ export function useReadingAssets(bookId: string) {
       setError(
         bookmarkError instanceof Error
           ? bookmarkError.message
-          : '保存书签失败。',
+          : t('errors.saveBookmark'),
       )
       return false
     } finally {

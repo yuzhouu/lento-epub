@@ -1,4 +1,5 @@
 import { Trash2, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { QUICK_HIGHLIGHT_COLOR_OPTIONS } from '../../../lib/reading-highlight-colors'
 import type {
   ReadingHighlightColor,
@@ -42,29 +43,31 @@ export function SelectionEditor({
   onColorChange,
   onLineStyleChange,
 }: SelectionEditorProps) {
+  const { t } = useTranslation()
+
   return (
     <aside
       className="selection-editor"
       role="dialog"
-      aria-label="为选中文字添加划线和批注"
+      aria-label={t('reader.assets.editorLabel')}
     >
       <div className="selection-editor-heading">
         <div>
-          <span>划线与批注</span>
-          <strong>{selection.chapterLabel || '当前章节'}</strong>
+          <span>{t('reader.assets.editorTitle')}</span>
+          <strong>{selection.chapterLabel || t('reader.assets.currentChapter')}</strong>
         </div>
         {isExisting ? (
           <button
             className="selection-editor-delete"
             type="button"
-            aria-label="删除划线和批注"
+            aria-label={t('reader.assets.deleteSelection')}
             disabled={isSaving}
             onClick={onDelete}
           >
             <Trash2 aria-hidden="true" size={15} strokeWidth={1.65} />
           </button>
         ) : null}
-        <button type="button" aria-label="关闭划线与批注" onClick={onDismiss}>
+        <button type="button" aria-label={t('reader.assets.closeSelection')} onClick={onDismiss}>
           <X aria-hidden="true" size={16} strokeWidth={1.7} />
         </button>
       </div>
@@ -81,7 +84,7 @@ export function SelectionEditor({
         value={note}
         maxLength={2000}
         rows={3}
-        placeholder="写下批注，离开后自动保存"
+        placeholder={t('reader.assets.autosavePlaceholder')}
         onChange={(event) => onNoteChange(event.target.value)}
         onBlur={(event) => {
           const nextTarget = event.relatedTarget

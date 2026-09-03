@@ -1,5 +1,8 @@
 import { useRef, useState } from 'react'
 import { ArchiveRestore, Download } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
+import { getCurrentLanguage } from '../../i18n'
 import { getStorageErrorMessage } from '../../data/indexed-db/storage-capacity'
 import { RestoreBackupDialog } from './RestoreBackupDialog'
 import type { LibraryAlertNotice } from './LibraryAlert'
@@ -22,23 +25,29 @@ function describeRestoreResult(result: {
   overwrittenCount: number
   keptBothCount: number
   skippedCount: number
-}): string {
+}, t: TFunction): string {
   const restoredCount =
     result.addedCount + result.overwrittenCount + result.keptBothCount
   if (restoredCount === 0) {
-    return `没有恢复书籍，已跳过 ${result.skippedCount} 本冲突书籍。`
+    return t('library.backup.noneRestored', { count: result.skippedCount })
   }
 
   const parts: string[] = []
-  if (result.addedCount > 0) parts.push(`新增 ${result.addedCount} 本`)
+  if (result.addedCount > 0) parts.push(t('library.backup.resultAdded', { count: result.addedCount }))
   if (result.overwrittenCount > 0) {
-    parts.push(`覆盖 ${result.overwrittenCount} 本`)
+    parts.push(t('library.backup.resultOverwritten', { count: result.overwrittenCount }))
   }
   if (result.keptBothCount > 0) {
-    parts.push(`保留副本 ${result.keptBothCount} 本`)
+    parts.push(t('library.backup.resultKept', { count: result.keptBothCount }))
   }
-  if (result.skippedCount > 0) parts.push(`跳过 ${result.skippedCount} 本`)
-  return `已恢复 ${restoredCount} 本书：${parts.join('，')}。`
+  if (result.skippedCount > 0) parts.push(t('library.backup.resultSkipped', { count: result.skippedCount }))
+  return t('library.backup.restored', {
+    count: restoredCount,
+    details: new Intl.ListFormat(getCurrentLanguage(), {
+      style: 'short',
+      type: 'conjunction',
+    }).format(parts),
+  })
 }
 
 export function LibraryBackupActions({
@@ -46,6 +55,7 @@ export function LibraryBackupActions({
   onRestored,
   onAlert,
 }: LibraryBackupActionsProps) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const [operation, setOperation] = useState<BackupOperation>()
   const [preview, setPreview] = useState<LibraryBackupPreview>()
@@ -62,7 +72,7 @@ export function LibraryBackupActions({
         getStorageErrorMessage(backupError) ??
         (backupError instanceof Error
           ? backupError.message
-          : '书库操作失败。'),
+          : t('library.backup.genericError')),
     })
   }
 
@@ -73,7 +83,7 @@ export function LibraryBackupActions({
       const result = await exportLibraryBackup()
       onAlert({
         kind: 'success',
-        message: `已导出 ${result.bookCount} 本书。`,
+        message: t('library.backup.exported', { count: result.bookCount }),
       })
     } catch (backupError) {
       finishWithError(backupError)
@@ -105,7 +115,7 @@ export function LibraryBackupActions({
       const { restoreLibraryBackup } = await import('../../lib/library-backup')
       const result = await restoreLibraryBackup(preview, resolutions)
       onRestored(result.books)
-      onAlert({ kind: 'success', message: describeRestoreResult(result) })
+      onAlert({ kind: 'success', message: describeRestoreResult(result, t) })
       setPreview(undefined)
     } catch (backupError) {
       setPreview(undefined)
@@ -130,21 +140,21 @@ export function LibraryBackupActions({
           type="button"
           disabled={!hasBooks || operation !== undefined}
           onClick={() => void handleExport()}
-          title="导出包含 EPUB 和阅读进度的书库备份"
+          title={t('library.backup.exportTitle')}
         >
           <Download aria-hidden="true" size={17} strokeWidth={1.7} />
-          <span>{operation === 'export' ? '正在备份…' : '备份书库'}</span>
+          <span>{operation === 'export' ? t('library.backup.exporting') : t('library.backup.export')}</span>
         </button>
         <button
           className="secondary-button library-utility-button"
           type="button"
           disabled={operation !== undefined}
           onClick={() => inputRef.current?.click()}
-          title="预览并恢复卷舍书库备份，不会删除现有书籍"
+          title={t('library.backup.restoreTitle')}
         >
           <ArchiveRestore aria-hidden="true" size={17} strokeWidth={1.7} />
           <span>
-            {operation === 'preview' ? '正在读取…' : '恢复备份'}
+            {operation === 'preview' ? t('library.backup.previewing') : t('library.backup.restore')}
           </span>
         </button>
       </div>
