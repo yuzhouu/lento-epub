@@ -2315,6 +2315,10 @@
   width: 100%;
 }
 
+.reader-stage.is-scroll-flow .epub-view {
+  min-height: 100%;
+}
+
 .reader-footer {
   position: absolute;
   z-index: 3;

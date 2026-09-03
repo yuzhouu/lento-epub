@@ -9,6 +9,10 @@ import type {
   TocItem,
 } from '../../../types/book'
 import { attachReadingHighlightHover, renderReadingHighlight } from '../epub/epub-annotations'
+import {
+  attachMinimumChapterHeight,
+  type MinimumChapterHeightController,
+} from '../epub/epub-chapter-spacing'
 import { EpubReaderRuntime } from '../epub/EpubReaderRuntime'
 import {
   attachContentScrollBridge,
@@ -100,6 +104,8 @@ export function useEpubReader(options: UseEpubReaderOptions) {
   const viewerRef = useRef<HTMLDivElement>(null)
   const renditionRef = useRef<EpubRendition | null>(null)
   const scrollBridgeRef = useRef<ContentScrollBridgeController | null>(null)
+  const minimumChapterHeightRef =
+    useRef<MinimumChapterHeightController | null>(null)
   const currentLocationRef = useRef(bookRecord.location)
   const currentBookIdRef = useRef(bookRecord.id)
   const tocRef = useRef<TocItem[]>([])
@@ -164,6 +170,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
     let removeContentDocumentEvents: (() => void) | undefined
     let removeRelocationListener: (() => void) | undefined
     let removeSelectionListener: (() => void) | undefined
+    let removeMinimumChapterHeight: (() => void) | undefined
     let updateScrolledChapterProgress: (() => void) | undefined
     let persistTimer: ReturnType<typeof setTimeout> | undefined
     let pendingReadingState:
@@ -380,6 +387,16 @@ export function useEpubReader(options: UseEpubReaderOptions) {
         const navigationItems = navigation.toc as TocItem[]
         tocRef.current = navigationItems
         setToc(navigationItems)
+        if (preferencesRef.current.flow !== 'paginated') {
+          const minimumChapterHeight = attachMinimumChapterHeight(
+            rendition,
+            book,
+            viewerElement,
+            navigationItems,
+          )
+          minimumChapterHeightRef.current = minimumChapterHeight
+          removeMinimumChapterHeight = minimumChapterHeight.cleanup
+        }
 
         function handleRelocated(location: ReaderLocation) {
           const nextProgress = locationsReady
@@ -509,6 +526,12 @@ export function useEpubReader(options: UseEpubReaderOptions) {
       removeContentDocumentEvents?.()
       removeRelocationListener?.()
       removeSelectionListener?.()
+      removeMinimumChapterHeight?.()
+      if (
+        minimumChapterHeightRef.current?.cleanup === removeMinimumChapterHeight
+      ) {
+        minimumChapterHeightRef.current = null
+      }
       if (scrollBridgeRef.current?.cleanup === removeContentScrollBridge) {
         scrollBridgeRef.current = null
       }
@@ -520,6 +543,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
 
   useEffect(() => {
     const rendition = renditionRef.current
+    let updateFrame: number | undefined
     if (rendition) {
       registerReaderTheme(rendition, {
         theme: preferences.theme,
@@ -530,7 +554,11 @@ export function useEpubReader(options: UseEpubReaderOptions) {
         readerWidth: preferences.readerWidth,
         paragraphStyle: preferences.paragraphStyle,
       })
+      updateFrame = requestAnimationFrame(() => {
+        minimumChapterHeightRef.current?.scheduleUpdate()
+      })
     }
+    return () => cancelAnimationFrame(updateFrame ?? 0)
   }, [
     preferences.font,
     preferences.fontSize,
@@ -564,6 +592,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
       cancelAnimationFrame(resizeFrame ?? 0)
       resizeFrame = requestAnimationFrame(() => {
         renditionRef.current?.resize(width, height)
+        minimumChapterHeightRef.current?.scheduleUpdate()
       })
     })
     resizeObserver.observe(viewer)
@@ -615,7 +644,12 @@ export function useEpubReader(options: UseEpubReaderOptions) {
     setCurrentHref(nextHref)
     setChapterLabel(nextLabel)
     resetChapterBoundary()
-    void renditionRef.current?.display(href)
+    const display = renditionRef.current?.display(href)
+    void display?.then(() => {
+      requestAnimationFrame(() => {
+        scrollBridgeRef.current?.scrollToChapter(href)
+      })
+    })
   }
 
   return {
