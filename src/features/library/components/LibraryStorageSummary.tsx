@@ -17,6 +17,78 @@ interface LibraryStorageSummaryProps {
   storageInfo?: LibraryStorageInfo
 }
 
+interface LibraryStorageDisplayProps {
+  storageInfo?: LibraryStorageInfo
+}
+
+export function LibraryStorageOverview({
+  storageInfo,
+}: LibraryStorageDisplayProps) {
+  const { t } = useTranslation()
+  const usagePercent =
+    storageInfo?.usedBytes !== undefined && storageInfo.quotaBytes
+      ? Math.min(100, (storageInfo.usedBytes / storageInfo.quotaBytes) * 100)
+      : undefined
+
+  return (
+    <div
+      className={`library-storage-overview${
+        storageInfo?.isLow ? ' is-low' : ''
+      }`}
+      role="status"
+      title={t('library.storage.title')}
+    >
+      {storageInfo ? (
+        storageInfo.quotaBytes !== undefined ? (
+          <>
+            <span>{t('library.storage.total')}</span>
+            <span className="library-storage-value">
+              {formatBytes(storageInfo.usedBytes ?? storageInfo.bookBytes)} /{' '}
+              {formatBytes(storageInfo.quotaBytes)}
+            </span>
+            <span className="library-storage-percent">
+              {formatUsagePercent(usagePercent ?? 0)}
+            </span>
+          </>
+        ) : (
+          <span>
+            {t('library.storage.books', {
+              size: formatBytes(storageInfo.bookBytes),
+            })}
+          </span>
+        )
+      ) : (
+        <span>{t('library.storage.calculating')}</span>
+      )}
+    </div>
+  )
+}
+
+export function LibraryStorageWarning({
+  storageInfo,
+}: LibraryStorageDisplayProps) {
+  const { t } = useTranslation()
+
+  if (!storageInfo?.isLow) return null
+
+  return (
+    <div className="library-storage-warning" role="alert">
+      <TriangleAlert aria-hidden="true" size={19} strokeWidth={1.7} />
+      <div>
+        <strong>{t('library.storage.lowTitle')}</strong>
+        <span>
+          {storageInfo.availableBytes !== undefined
+            ? t('library.storage.lowRemaining', {
+                size: formatBytes(storageInfo.availableBytes),
+              })
+            : t('library.storage.lowUnknown')}{' '}
+          {t('library.storage.lowAction')}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function LibraryStorageSummary({
   bookCount,
   visibleBookCount,
@@ -24,10 +96,6 @@ export function LibraryStorageSummary({
   storageInfo,
 }: LibraryStorageSummaryProps) {
   const { t } = useTranslation()
-  const usagePercent =
-    storageInfo?.usedBytes !== undefined && storageInfo.quotaBytes
-      ? Math.min(100, (storageInfo.usedBytes / storageInfo.quotaBytes) * 100)
-      : undefined
 
   return (
     <>
@@ -39,49 +107,11 @@ export function LibraryStorageSummary({
               ? t('library.storage.filteredCount', { visible: visibleBookCount, total: bookCount })
               : t('common.books', { count: bookCount })}
           </span>
-          <div
-            className={`library-storage-overview${
-              storageInfo?.isLow ? ' is-low' : ''
-            }`}
-            role="status"
-            title={t('library.storage.title')}
-          >
-            {storageInfo ? (
-              storageInfo.quotaBytes !== undefined ? (
-                <>
-                  <span>{t('library.storage.total')}</span>
-                  <span className="library-storage-value">
-                    {formatBytes(storageInfo.usedBytes ?? storageInfo.bookBytes)} /{' '}
-                    {formatBytes(storageInfo.quotaBytes)}
-                  </span>
-                  <span className="library-storage-percent">
-                    {formatUsagePercent(usagePercent ?? 0)}
-                  </span>
-                </>
-              ) : (
-                <span>{t('library.storage.books', { size: formatBytes(storageInfo.bookBytes) })}</span>
-              )
-            ) : (
-              <span>{t('library.storage.calculating')}</span>
-            )}
-          </div>
+          <LibraryStorageOverview storageInfo={storageInfo} />
         </div>
       </div>
 
-      {storageInfo?.isLow ? (
-        <div className="library-storage-warning" role="alert">
-          <TriangleAlert aria-hidden="true" size={19} strokeWidth={1.7} />
-          <div>
-            <strong>{t('library.storage.lowTitle')}</strong>
-            <span>
-              {storageInfo.availableBytes !== undefined
-                ? t('library.storage.lowRemaining', { size: formatBytes(storageInfo.availableBytes) })
-                : t('library.storage.lowUnknown')}{' '}
-              {t('library.storage.lowAction')}
-            </span>
-          </div>
-        </div>
-      ) : null}
+      <LibraryStorageWarning storageInfo={storageInfo} />
     </>
   )
 }

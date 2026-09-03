@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  BookOpenText,
   Files,
   Search,
 } from 'lucide-react'
@@ -24,8 +23,13 @@ import { useLibraryQuery } from '../../features/library/hooks/useLibraryQuery'
 import { useEpubDrop } from '../../features/library/hooks/useEpubDrop'
 import { useLibraryStorage } from '../../features/library/hooks/useLibraryStorage'
 import { LibraryToolbar } from '../../features/library/components/LibraryToolbar'
-import { LibraryStorageSummary } from '../../features/library/components/LibraryStorageSummary'
+import {
+  LibraryStorageOverview,
+  LibraryStorageSummary,
+  LibraryStorageWarning,
+} from '../../features/library/components/LibraryStorageSummary'
 import { useDeleteUndo } from '../../features/library/hooks/useDeleteUndo'
+import libraryEmptyArtwork from '../../assets/library-empty-book-alpha.webp'
 import { LanguageSwitcher } from '../LanguageSwitcher'
 
 interface LibraryPageProps {
@@ -93,7 +97,9 @@ export function LibraryPage({
 
   return (
     <main
-      className={`library-page${drop.isDraggingFiles ? ' is-dragging' : ''}`}
+      className={`library-page${books.length ? '' : ' is-empty'}${
+        drop.isDraggingFiles ? ' is-dragging' : ''
+      }`}
       {...drop.dropProps}
     >
       <header className="library-header">
@@ -120,15 +126,15 @@ export function LibraryPage({
       </header>
 
       <section className="library-content" aria-labelledby="library-title">
-        <LibraryStorageSummary
-          bookCount={books.length}
-          visibleBookCount={query.visibleBooks.length}
-          hasActiveFilters={query.hasActiveFilters}
-          storageInfo={storageInfo}
-        />
-
         {books.length ? (
           <>
+            <LibraryStorageSummary
+              bookCount={books.length}
+              visibleBookCount={query.visibleBooks.length}
+              hasActiveFilters={query.hasActiveFilters}
+              storageInfo={storageInfo}
+            />
+
             <LibraryToolbar
               searchQuery={query.searchQuery}
               sortBy={query.sortBy}
@@ -204,29 +210,52 @@ export function LibraryPage({
             </div>
           </>
         ) : (
-          <div className="empty-library">
-            <BookOpenText aria-hidden="true" size={40} strokeWidth={1.2} />
-            <h2>{t('library.emptyTitle')}</h2>
-            <p>{t('library.emptyBody')}</p>
-            <ImportBookButton
-              compact
-              isImporting={isImporting}
-              onFilesSelected={(files) => void onImportFiles(files)}
-            />
+          <div className="library-empty-editorial">
+            <div className="library-empty-copy">
+              <div className="library-empty-heading">
+                <h2 id="library-title">{t('library.heading')}</h2>
+                <span>{t('common.books', { count: 0 })}</span>
+              </div>
+
+              <span className="library-empty-accent" aria-hidden="true" />
+
+              <LibraryStorageWarning storageInfo={storageInfo} />
+
+              <div className="empty-library">
+                <h3>{t('library.emptyTitle')}</h3>
+                <p>{t('library.emptyBody')}</p>
+                <ImportBookButton
+                  isImporting={isImporting}
+                  onFilesSelected={(files) => void onImportFiles(files)}
+                />
+              </div>
+            </div>
+
+            <div className="library-empty-art" aria-hidden="true">
+              <img src={libraryEmptyArtwork} alt="" />
+            </div>
           </div>
         )}
       </section>
 
       <footer className="library-footer">
-        <span className="library-footer-brand">{t('common.brand')}</span>
-        <nav aria-label={t('library.productInfo')}>
-          <span>© yuzhou</span>
-          <span className="library-footer-separator" aria-hidden="true">·</span>
-          <a href="#/about">{t('common.about')}</a>
-          <span className="library-footer-separator" aria-hidden="true">·</span>
-          <a href="#/privacy">{t('common.privacy')}</a>
-        </nav>
-        <LanguageSwitcher compact />
+        <div className="library-footer-links">
+          <nav aria-label={t('library.productInfo')}>
+            <span>© yuzhou</span>
+            <span className="library-footer-separator" aria-hidden="true">
+              ·
+            </span>
+            <a href="#/about">{t('common.about')}</a>
+            <span className="library-footer-separator" aria-hidden="true">
+              ·
+            </span>
+            <a href="#/privacy">{t('common.privacy')}</a>
+          </nav>
+          <LanguageSwitcher compact />
+        </div>
+        {books.length ? null : (
+          <LibraryStorageOverview storageInfo={storageInfo} />
+        )}
       </footer>
 
       {drop.isDraggingFiles ? (
