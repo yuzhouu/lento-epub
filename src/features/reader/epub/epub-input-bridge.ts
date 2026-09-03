@@ -1,5 +1,9 @@
 import type { EpubRendition } from './epub-types'
-import { isSameChapterHref } from './epub-navigation'
+import { locateChapterStart } from './epub-chapter-locator'
+import {
+  isSameChapterResource,
+  type EpubChapterReference,
+} from './epub-navigation'
 
 export interface ChapterScrollProgress {
   progress: number
@@ -86,35 +90,8 @@ export function getChapterScrollTopForProgress(
 export interface ContentScrollBridgeController {
   update: () => void
   scrollToProgress: (progress: number) => void
-  scrollToChapter: (href: string) => boolean
+  scrollToChapter: (chapter: EpubChapterReference) => boolean
   cleanup: () => void
-}
-
-function getChapterFragment(href: string): string | undefined {
-  const fragment = href.split('#')[1]
-  if (!fragment) return undefined
-  try {
-    return decodeURIComponent(fragment)
-  } catch {
-    return fragment
-  }
-}
-
-function findChapterAnchor(
-  contentDocument: Document,
-  fragment: string,
-): Element | undefined {
-  return (
-    contentDocument.getElementById(fragment) ??
-    contentDocument.getElementsByName(fragment)[0]
-  )
-}
-
-function getDocumentOffsetTop(element: Element): number {
-  return (
-    element.getBoundingClientRect().top +
-    (element.ownerDocument.defaultView?.scrollY ?? 0)
-  )
 }
 
 export function attachContentScrollBridge(
@@ -235,7 +212,7 @@ export function attachContentScrollBridge(
     update()
   }
 
-  function scrollToChapter(href: string): boolean {
+  function scrollToChapter(chapter: EpubChapterReference): boolean {
     const container = getScrollContainer()
     if (!container) return false
     const connectedViews = [...renderedViews.values()].filter(
@@ -244,24 +221,29 @@ export function attachContentScrollBridge(
     let view = connectedViews.find(
       (renderedView) =>
         renderedView.resourceHref &&
-        isSameChapterHref(renderedView.resourceHref, href),
+        isSameChapterResource(
+          renderedView.resourceHref,
+          chapter.resourceHref,
+        ),
     )
-    const fragment = getChapterFragment(href)
-    let anchor =
-      fragment && view ? findChapterAnchor(view.document, fragment) : undefined
-    if (fragment && !anchor) {
+    let chapterStart = view
+      ? locateChapterStart(view.document, chapter)
+      : undefined
+    if (!chapterStart && chapter.fragment) {
       for (const renderedView of connectedViews) {
-        const matchingAnchor = findChapterAnchor(renderedView.document, fragment)
-        if (!matchingAnchor) continue
+        const matchingStart = locateChapterStart(
+          renderedView.document,
+          chapter,
+        )
+        if (!matchingStart) continue
         view = renderedView
-        anchor = matchingAnchor
+        chapterStart = matchingStart
         break
       }
     }
     if (!view) return false
-    if (fragment && !anchor) return false
-    container.scrollTop =
-      view.element.offsetTop + (anchor ? getDocumentOffsetTop(anchor) : 0)
+    if (!chapterStart) return false
+    container.scrollTop = view.element.offsetTop + chapterStart.offset
     update()
     return true
   }

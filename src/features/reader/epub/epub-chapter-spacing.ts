@@ -1,6 +1,6 @@
-import type { TocItem } from '../../../types/book'
 import type { EpubBook, EpubRendition } from './epub-types'
-import { flattenToc, isSameChapterHref } from './epub-navigation'
+import { locateResourceChapters } from './epub-chapter-locator'
+import type { EpubChapterIndex } from './epub-navigation'
 
 const CHAPTER_SPACER_ATTRIBUTE = 'data-lento-chapter-spacer'
 const XHTML_NAMESPACE = 'http://www.w3.org/1999/xhtml'
@@ -19,30 +19,6 @@ export interface MinimumChapterHeightController {
   update: () => void
   scheduleUpdate: () => void
   cleanup: () => void
-}
-
-function getFragment(href: string): string | undefined {
-  const fragment = href.split('#')[1]
-  if (!fragment) return undefined
-  try {
-    return decodeURIComponent(fragment)
-  } catch {
-    return fragment
-  }
-}
-
-function findAnchor(document: Document, fragment: string): Element | undefined {
-  return (
-    document.getElementById(fragment) ??
-    document.getElementsByName(fragment)[0]
-  )
-}
-
-function getDocumentOffsetTop(element: Element): number {
-  return (
-    element.getBoundingClientRect().top +
-    (element.ownerDocument.defaultView?.scrollY ?? 0)
-  )
 }
 
 function getDocumentHeight(document: Document): number {
@@ -81,7 +57,7 @@ function createSpacer(document: Document, key: string): HTMLElement {
 
 function applyMinimumChapterHeight(
   document: Document,
-  toc: TocItem[],
+  chapterIndex: EpubChapterIndex,
   resourceHref: string,
   viewportHeight: number,
 ) {
@@ -95,15 +71,14 @@ function applyMinimumChapterHeight(
       ]),
   )
   const usedSpacerKeys = new Set<string>()
-  const seenAnchors = new Set<Element>()
-  const anchors = flattenToc(toc).flatMap((item) => {
-    if (!isSameChapterHref(resourceHref, item.href)) return []
-    const fragment = getFragment(item.href)
-    const anchor = fragment ? findAnchor(document, fragment) : document.body
-    if (!anchor || seenAnchors.has(anchor)) return []
-    seenAnchors.add(anchor)
-    return [anchor]
-  })
+  for (const spacer of existingSpacers.values()) {
+    spacer.style.setProperty('height', '0', 'important')
+  }
+  const chapters = locateResourceChapters(
+    document,
+    chapterIndex,
+    resourceHref,
+  )
 
   function getSpacer(key: string): HTMLElement {
     const existing = existingSpacers.get(key)
@@ -111,34 +86,34 @@ function applyMinimumChapterHeight(
     return createSpacer(document, key)
   }
 
-  for (let index = 0; index < anchors.length - 1; index += 1) {
-    const currentAnchor = anchors[index]
-    const nextAnchor = anchors[index + 1]
-    const parent = nextAnchor.parentNode
+  for (let index = 0; index < chapters.length - 1; index += 1) {
+    const currentChapter = chapters[index]
+    const nextChapter = chapters[index + 1]
+    const parent = nextChapter.anchor.parentNode
     if (!parent) continue
 
     const key = `before-${index + 1}`
     const spacer = getSpacer(key)
     usedSpacerKeys.add(key)
     spacer.style.setProperty('height', '0', 'important')
-    parent.insertBefore(spacer, nextAnchor)
+    parent.insertBefore(spacer, nextChapter.anchor)
     const spacerHeight = getMinimumChapterSpacerHeight(
-      getDocumentOffsetTop(currentAnchor),
-      getDocumentOffsetTop(nextAnchor),
+      currentChapter.offset,
+      nextChapter.offset,
       viewportHeight,
     )
     spacer.style.setProperty('height', `${spacerHeight}px`, 'important')
   }
 
-  const lastAnchor = anchors.at(-1)
-  if (lastAnchor) {
+  const lastChapter = chapters.at(-1)
+  if (lastChapter) {
     const key = 'after-last'
     const spacer = getSpacer(key)
     usedSpacerKeys.add(key)
     spacer.style.setProperty('height', '0', 'important')
     document.body.append(spacer)
     const spacerHeight = getMinimumChapterSpacerHeight(
-      getDocumentOffsetTop(lastAnchor),
+      lastChapter.offset,
       getDocumentHeight(document),
       viewportHeight,
     )
@@ -154,7 +129,7 @@ export function attachMinimumChapterHeight(
   rendition: EpubRendition,
   book: EpubBook,
   viewerElement: HTMLElement,
-  toc: TocItem[],
+  chapterIndex: EpubChapterIndex,
 ): MinimumChapterHeightController {
   const trackedContents = new Map<Document, TrackedContents>()
   let updateFrame: number | undefined
@@ -174,7 +149,7 @@ export function attachMinimumChapterHeight(
     trackedContents.set(document, { document, resourceHref })
     applyMinimumChapterHeight(
       document,
-      toc,
+      chapterIndex,
       resourceHref,
       getViewportHeight(),
     )
@@ -191,7 +166,7 @@ export function attachMinimumChapterHeight(
       }
       applyMinimumChapterHeight(
         tracked.document,
-        toc,
+        chapterIndex,
         tracked.resourceHref,
         viewportHeight,
       )

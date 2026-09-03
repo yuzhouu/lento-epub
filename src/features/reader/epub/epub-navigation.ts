@@ -1,23 +1,76 @@
 import type { ReaderLocation, TocItem } from '../../../types/book'
 
-function stripChapterFragment(href: string): string {
-  return href.split('#')[0]
+export interface EpubChapterReference {
+  item: TocItem
+  order: number
+  resourceHref: string
+  fragment?: string
 }
 
-function getChapterFragment(href: string): string | undefined {
-  const fragment = href.split('#')[1]
-  if (!fragment) return undefined
+export interface EpubChapterRange {
+  current: EpubChapterReference
+  nextInResource?: EpubChapterReference
+}
+
+export interface EpubChapterIndex {
+  chapters: readonly EpubChapterReference[]
+  find: (
+    href: string,
+    preferredLabel?: string,
+  ) => EpubChapterReference | undefined
+  findNeighbors: (currentHref: string) => {
+    previous?: EpubChapterReference
+    next?: EpubChapterReference
+  }
+  findRange: (currentHref: string) => EpubChapterRange | undefined
+  getChaptersInResource: (
+    resourceHref: string,
+  ) => readonly EpubChapterReference[]
+}
+
+export interface ParsedChapterHref {
+  resourceHref: string
+  fragment?: string
+}
+
+export function parseChapterHref(href: string): ParsedChapterHref {
+  const fragmentIndex = href.indexOf('#')
+  const resourceHref = fragmentIndex >= 0 ? href.slice(0, fragmentIndex) : href
+  const encodedFragment = fragmentIndex >= 0 ? href.slice(fragmentIndex + 1) : ''
+  if (!encodedFragment) return { resourceHref }
   try {
-    return decodeURIComponent(fragment)
+    return { resourceHref, fragment: decodeURIComponent(encodedFragment) }
   } catch {
-    return fragment
+    return { resourceHref, fragment: encodedFragment }
   }
 }
 
-function isExactChapterHref(leftHref: string, rightHref: string): boolean {
+function normalizeResourceHref(resourceHref: string): string {
+  return resourceHref.replace(/\\/g, '/').replace(/^\.\//, '')
+}
+
+export function isSameChapterResource(
+  leftHref: string,
+  rightHref: string,
+): boolean {
+  const leftPath = normalizeResourceHref(parseChapterHref(leftHref).resourceHref)
+  const rightPath = normalizeResourceHref(
+    parseChapterHref(rightHref).resourceHref,
+  )
   return (
-    isSameChapterHref(leftHref, rightHref) &&
-    getChapterFragment(leftHref) === getChapterFragment(rightHref)
+    leftPath === rightPath ||
+    leftPath.endsWith(`/${rightPath}`) ||
+    rightPath.endsWith(`/${leftPath}`)
+  )
+}
+
+function isExactChapterReference(
+  left: EpubChapterReference,
+  right: EpubChapterReference,
+): boolean {
+  return (
+    isSameChapterResource(left.resourceHref, right.resourceHref) &&
+    left.fragment === right.fragment
   )
 }
 
@@ -25,13 +78,7 @@ export function isSameChapterHref(
   currentHref: string,
   tocHref: string,
 ): boolean {
-  const currentPath = stripChapterFragment(currentHref)
-  const tocPath = stripChapterFragment(tocHref)
-  return (
-    currentPath === tocPath ||
-    currentPath.endsWith(tocPath) ||
-    tocPath.endsWith(currentPath)
-  )
+  return isSameChapterResource(currentHref, tocHref)
 }
 
 export function findChapterLabel(
@@ -49,77 +96,126 @@ export function flattenToc(items: TocItem[]): TocItem[] {
   ])
 }
 
+const chapterIndexCache = new WeakMap<TocItem[], EpubChapterIndex>()
+
+export function createChapterIndex(items: TocItem[]): EpubChapterIndex {
+  const chapters = flattenToc(items).map((item, order) => {
+    const { resourceHref, fragment } = parseChapterHref(item.href)
+    return { item, order, resourceHref, fragment }
+  })
+  const resourceCache = new Map<string, readonly EpubChapterReference[]>()
+
+  function getChaptersInResource(
+    resourceHref: string,
+  ): readonly EpubChapterReference[] {
+    const cached = resourceCache.get(resourceHref)
+    if (cached) return cached
+    const matches = chapters.filter((chapter) =>
+      isSameChapterResource(resourceHref, chapter.resourceHref),
+    )
+    resourceCache.set(resourceHref, matches)
+    return matches
+  }
+
+  function find(
+    href: string,
+    preferredLabel?: string,
+  ): EpubChapterReference | undefined {
+    const parsedHref = parseChapterHref(href)
+    const sameResource = getChaptersInResource(parsedHref.resourceHref)
+    const normalizedPreferredLabel = preferredLabel?.trim()
+    const preferred = normalizedPreferredLabel
+      ? sameResource.find(
+          (chapter) =>
+            chapter.item.label.trim() === normalizedPreferredLabel,
+        )
+      : undefined
+    if (preferred) return preferred
+
+    return (
+      sameResource.find((chapter) => chapter.fragment === parsedHref.fragment) ??
+      sameResource[0]
+    )
+  }
+
+  function findNeighbors(currentHref: string) {
+    const currentChapter = find(currentHref)
+    if (!currentChapter) return {}
+
+    const next = chapters
+      .slice(currentChapter.order + 1)
+      .find((chapter) => !isExactChapterReference(currentChapter, chapter))
+    let previous: EpubChapterReference | undefined
+    for (let index = currentChapter.order - 1; index >= 0; index -= 1) {
+      if (!isExactChapterReference(currentChapter, chapters[index])) {
+        previous = chapters[index]
+        break
+      }
+    }
+
+    return { previous, next }
+  }
+
+  function findRange(currentHref: string): EpubChapterRange | undefined {
+    const current = find(currentHref)
+    if (!current) return undefined
+    const nextDistinctChapter = chapters
+      .slice(current.order + 1)
+      .find((chapter) => !isExactChapterReference(current, chapter))
+    const nextInResource =
+      nextDistinctChapter &&
+      isSameChapterResource(
+        current.resourceHref,
+        nextDistinctChapter.resourceHref,
+      )
+        ? nextDistinctChapter
+        : undefined
+    return { current, nextInResource }
+  }
+
+  return {
+    chapters,
+    find,
+    findNeighbors,
+    findRange,
+    getChaptersInResource,
+  }
+}
+
+export function getChapterIndex(items: TocItem[]): EpubChapterIndex {
+  const cached = chapterIndexCache.get(items)
+  if (cached) return cached
+  const index = createChapterIndex(items)
+  chapterIndexCache.set(items, index)
+  return index
+}
+
 export function findChapterItem(
   items: TocItem[],
   href: string,
   preferredLabel?: string,
 ): TocItem | undefined {
-  const chapters = flattenToc(items)
-  const sameResource = chapters.filter((item) =>
-    isSameChapterHref(href, item.href),
-  )
-  const normalizedPreferredLabel = preferredLabel?.trim()
-  const preferred = normalizedPreferredLabel
-    ? sameResource.find(
-        (item) => item.label.trim() === normalizedPreferredLabel,
-      )
-    : undefined
-  if (preferred) return preferred
-
-  return (
-    chapters.find((item) => isExactChapterHref(href, item.href)) ??
-    sameResource[0]
-  )
+  return getChapterIndex(items).find(href, preferredLabel)?.item
 }
 
 export function findChapterNeighbors(
   items: TocItem[],
   currentHref: string,
 ): { previous?: TocItem; next?: TocItem } {
-  const chapters = flattenToc(items)
-  const currentChapter = findChapterItem(items, currentHref)
-  const currentIndex = currentChapter
-    ? chapters.indexOf(currentChapter)
-    : -1
-  if (!currentChapter || currentIndex < 0) return {}
-
-  const next = chapters
-    .slice(currentIndex + 1)
-    .find((item) => !isExactChapterHref(currentChapter.href, item.href))
-  let previous: TocItem | undefined
-  for (let index = currentIndex - 1; index >= 0; index -= 1) {
-    if (!isExactChapterHref(currentChapter.href, chapters[index].href)) {
-      previous = chapters[index]
-      break
-    }
-  }
-
-  return { previous, next }
+  const { previous, next } = getChapterIndex(items).findNeighbors(currentHref)
+  return { previous: previous?.item, next: next?.item }
 }
 
 export function findChapterAnchorRange(
   items: TocItem[],
   currentHref: string,
 ): { startFragment?: string; endFragment?: string } {
-  const chapters = flattenToc(items)
-  const currentChapter = findChapterItem(items, currentHref)
-  if (!currentChapter) return {}
-
-  const currentIndex = chapters.indexOf(currentChapter)
-  const nextDistinctChapter = chapters
-    .slice(currentIndex + 1)
-    .find((item) => !isExactChapterHref(currentChapter.href, item.href))
-  const nextChapterInResource =
-    nextDistinctChapter &&
-    isSameChapterHref(currentChapter.href, nextDistinctChapter.href)
-      ? nextDistinctChapter
-      : undefined
+  const range = getChapterIndex(items).findRange(currentHref)
+  if (!range) return {}
 
   return {
-    startFragment: getChapterFragment(currentChapter.href),
-    endFragment: nextChapterInResource
-      ? getChapterFragment(nextChapterInResource.href)
-      : undefined,
+    startFragment: range.current.fragment,
+    endFragment: range.nextInResource?.fragment,
   }
 }
 
@@ -129,19 +225,20 @@ export function findChapterAtOffset(
   offset: number,
   getFragmentOffset: (fragment: string) => number | undefined,
 ): TocItem | undefined {
+  const chapterIndex = getChapterIndex(items)
   let currentChapter: TocItem | undefined
   let currentOffset = Number.NEGATIVE_INFINITY
 
-  for (const item of flattenToc(items)) {
-    if (!isSameChapterHref(resourceHref, item.href)) continue
-    const fragment = getChapterFragment(item.href)
-    const itemOffset = fragment ? getFragmentOffset(fragment) : 0
+  for (const chapter of chapterIndex.getChaptersInResource(resourceHref)) {
+    const itemOffset = chapter.fragment
+      ? getFragmentOffset(chapter.fragment)
+      : 0
     if (
       itemOffset !== undefined &&
       itemOffset <= offset + 1 &&
       itemOffset >= currentOffset
     ) {
-      currentChapter = item
+      currentChapter = chapter.item
       currentOffset = itemOffset
     }
   }

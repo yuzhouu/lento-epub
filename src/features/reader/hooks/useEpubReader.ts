@@ -10,6 +10,10 @@ import type {
 } from '../../../types/book'
 import { attachReadingHighlightHover, renderReadingHighlight } from '../epub/epub-annotations'
 import {
+  findChapterAtDocumentOffset,
+  locateChapterRange,
+} from '../epub/epub-chapter-locator'
+import {
   attachMinimumChapterHeight,
   type MinimumChapterHeightController,
 } from '../epub/epub-chapter-spacing'
@@ -20,11 +24,10 @@ import {
   type ContentScrollBridgeController,
 } from '../epub/epub-input-bridge'
 import {
-  findChapterAnchorRange,
-  findChapterAtOffset,
-  findChapterItem,
+  getChapterIndex,
   getChapterProgress,
-  isSameChapterHref,
+  isSameChapterResource,
+  type EpubChapterIndex,
 } from '../epub/epub-navigation'
 import { registerReaderTheme } from '../epub/epub-theme'
 import type { EpubRendition } from '../epub/epub-types'
@@ -78,23 +81,6 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
   )
 }
 
-function findChapterAnchor(
-  contentDocument: Document,
-  fragment: string,
-): Element | undefined {
-  return (
-    contentDocument.getElementById(fragment) ??
-    contentDocument.getElementsByName(fragment)[0]
-  )
-}
-
-function getDocumentOffsetTop(element: Element): number {
-  return (
-    element.getBoundingClientRect().top +
-    (element.ownerDocument.defaultView?.scrollY ?? 0)
-  )
-}
-
 export function useEpubReader(options: UseEpubReaderOptions) {
   const { bookRecord, preferences } = options
   const callbacksRef = useRef(options)
@@ -108,7 +94,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
     useRef<MinimumChapterHeightController | null>(null)
   const currentLocationRef = useRef(bookRecord.location)
   const currentBookIdRef = useRef(bookRecord.id)
-  const tocRef = useRef<TocItem[]>([])
+  const chapterIndexRef = useRef<EpubChapterIndex | undefined>(undefined)
   const currentChapterHrefRef = useRef<string | undefined>(undefined)
   const currentChapterLabelRef = useRef(bookRecord.chapterLabel)
   const [toc, setToc] = useState<TocItem[]>([])
@@ -151,7 +137,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
       callbacksRef.current.onBookChanged()
       currentBookIdRef.current = bookRecord.id
       currentLocationRef.current = bookRecord.location
-      tocRef.current = []
+      chapterIndexRef.current = undefined
       currentChapterHrefRef.current = undefined
       currentChapterLabelRef.current = bookRecord.chapterLabel
       setToc([])
@@ -345,33 +331,19 @@ export function useEpubReader(options: UseEpubReaderOptions) {
               ? {
                   getChapterRange: ({ document, element }) => {
                     const chapterHref = currentChapterHrefRef.current
-                    if (!chapterHref) return undefined
-                    const { startFragment, endFragment } =
-                      findChapterAnchorRange(tocRef.current, chapterHref)
-                    if (!startFragment && !endFragment) return undefined
-
-                    const startAnchor = startFragment
-                      ? findChapterAnchor(document, startFragment)
-                      : undefined
-                    const endAnchor = endFragment
-                      ? findChapterAnchor(document, endFragment)
-                      : undefined
-                    if (
-                      (startFragment && !startAnchor) ||
-                      (endFragment && !endAnchor)
-                    ) {
-                      return undefined
-                    }
+                    const chapterIndex = chapterIndexRef.current
+                    if (!chapterHref || !chapterIndex) return undefined
+                    const range = locateChapterRange(
+                      document,
+                      chapterIndex,
+                      chapterHref,
+                      element.offsetHeight,
+                    )
+                    if (!range) return undefined
 
                     return {
-                      start:
-                        element.offsetTop +
-                        (startAnchor ? getDocumentOffsetTop(startAnchor) : 0),
-                      end:
-                        element.offsetTop +
-                        (endAnchor
-                          ? getDocumentOffsetTop(endAnchor)
-                          : element.offsetHeight),
+                      start: element.offsetTop + range.start,
+                      end: element.offsetTop + range.end,
                     }
                   },
                 }
@@ -385,14 +357,15 @@ export function useEpubReader(options: UseEpubReaderOptions) {
         const navigation = await book.loaded.navigation
         if (isCancelled) return
         const navigationItems = navigation.toc as TocItem[]
-        tocRef.current = navigationItems
+        const chapterIndex = getChapterIndex(navigationItems)
+        chapterIndexRef.current = chapterIndex
         setToc(navigationItems)
         if (preferencesRef.current.flow !== 'paginated') {
           const minimumChapterHeight = attachMinimumChapterHeight(
             rendition,
             book,
             viewerElement,
-            navigationItems,
+            chapterIndex,
           )
           minimumChapterHeightRef.current = minimumChapterHeight
           removeMinimumChapterHeight = minimumChapterHeight.cleanup
@@ -411,10 +384,11 @@ export function useEpubReader(options: UseEpubReaderOptions) {
           const currentChapterHref = currentChapterHrefRef.current
           const staysInCurrentResource = Boolean(
             currentChapterHref &&
-              isSameChapterHref(currentChapterHref, location.start.href),
+              isSameChapterResource(currentChapterHref, location.start.href),
           )
           const renderedChapter = !currentChapterHref
             ? (() => {
+                const chapterIndex = chapterIndexRef.current
                 const container = viewerElement.querySelector<HTMLElement>(
                   '.epub-container',
                 )
@@ -425,23 +399,21 @@ export function useEpubReader(options: UseEpubReaderOptions) {
                     container.scrollTop <
                       element.offsetTop + element.offsetHeight,
                 )
-                if (!container || !renderedView) return undefined
+                if (!chapterIndex || !container || !renderedView) {
+                  return undefined
+                }
                 const [contentDocument, viewElement] = renderedView
-                return findChapterAtOffset(
-                  tocRef.current,
+                return findChapterAtDocumentOffset(
+                  contentDocument,
+                  chapterIndex,
                   location.start.href,
                   container.scrollTop - viewElement.offsetTop,
-                  (fragment) => {
-                    const anchor = findChapterAnchor(contentDocument, fragment)
-                    return anchor ? getDocumentOffsetTop(anchor) : undefined
-                  },
-                )
+                )?.item
               })()
             : undefined
           const nextChapter =
             renderedChapter ??
-            findChapterItem(
-              tocRef.current,
+            chapterIndexRef.current?.find(
               staysInCurrentResource && currentChapterHref
                 ? currentChapterHref
                 : location.start.href,
@@ -450,7 +422,7 @@ export function useEpubReader(options: UseEpubReaderOptions) {
                 : currentChapterHref
                   ? undefined
                   : bookRecord.chapterLabel,
-            )
+            )?.item
           const nextChapterHref = nextChapter?.href ?? location.start.href
           const nextChapterLabel = nextChapter?.label.trim()
           currentChapterHrefRef.current = nextChapterHref
@@ -636,9 +608,9 @@ export function useEpubReader(options: UseEpubReaderOptions) {
   }
 
   function displayChapter(href: string) {
-    const chapter = findChapterItem(tocRef.current, href)
-    const nextHref = chapter?.href ?? href
-    const nextLabel = chapter?.label.trim()
+    const chapter = chapterIndexRef.current?.find(href)
+    const nextHref = chapter?.item.href ?? href
+    const nextLabel = chapter?.item.label.trim()
     currentChapterHrefRef.current = nextHref
     currentChapterLabelRef.current = nextLabel
     setCurrentHref(nextHref)
@@ -647,7 +619,11 @@ export function useEpubReader(options: UseEpubReaderOptions) {
     const display = renditionRef.current?.display(href)
     void display?.then(() => {
       requestAnimationFrame(() => {
-        scrollBridgeRef.current?.scrollToChapter(href)
+        if (!chapter) return
+        scrollBridgeRef.current?.scrollToChapter(chapter)
+        requestAnimationFrame(() => {
+          scrollBridgeRef.current?.scrollToChapter(chapter)
+        })
       })
     })
   }

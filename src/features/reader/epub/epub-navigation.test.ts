@@ -6,8 +6,11 @@ import {
   findChapterItem,
   findChapterLabel,
   findChapterNeighbors,
+  getChapterIndex,
   getChapterProgress,
+  isSameChapterResource,
   isSameChapterHref,
+  parseChapterHref,
 } from './epub-navigation'
 
 const toc: TocItem[] = [
@@ -39,6 +42,42 @@ describe('EPUB navigation', () => {
       ),
     ).toBe(true)
     expect(findChapterLabel(toc, 'OPS/text/chapter-2.xhtml#p4')).toBe('第二章')
+    expect(
+      isSameChapterResource(
+        'OPS/text/chapter-1.xhtml',
+        'text/chapter-1.xhtml',
+      ),
+    ).toBe(true)
+    expect(
+      isSameChapterResource(
+        'text/not-chapter-1.xhtml',
+        'chapter-1.xhtml',
+      ),
+    ).toBe(false)
+    expect(parseChapterHref('text/chapter.xhtml#chapter%202')).toEqual({
+      resourceHref: 'text/chapter.xhtml',
+      fragment: 'chapter 2',
+    })
+  })
+
+  it('builds one index for a volume title and chapters in the same XHTML', () => {
+    const sharedResourceToc: TocItem[] = [
+      { id: 'volume-1', href: 'text/journey.xhtml#volume-1', label: '上册' },
+      { id: 'chapter-1', href: 'text/journey.xhtml#chapter-1', label: '第一回' },
+      { id: 'chapter-2', href: 'text/journey.xhtml#chapter-2', label: '第二回' },
+    ]
+    const chapterIndex = getChapterIndex(sharedResourceToc)
+
+    expect(getChapterIndex(sharedResourceToc)).toBe(chapterIndex)
+    expect(
+      chapterIndex
+        .getChaptersInResource('OEBPS/text/journey.xhtml')
+        .map((chapter) => chapter.item.label),
+    ).toEqual(['上册', '第一回', '第二回'])
+    expect(chapterIndex.findRange('text/journey.xhtml#volume-1')).toMatchObject({
+      current: { fragment: 'volume-1' },
+      nextInResource: { fragment: 'chapter-1' },
+    })
   })
 
   it('flattens nested chapters when finding neighbors', () => {
