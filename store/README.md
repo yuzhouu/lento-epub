@@ -70,7 +70,7 @@
 - `assets/screenshot-library-1280x800.png`：书架实际界面
 - `assets/screenshot-reader-1280x800.png`：阅读实际界面
 - `assets/promo-small-440x280.png`：必需的小型宣传图
-- `assets-src/`：可编辑的 SVG 源文件
+- `assets-src/`：可编辑的 SVG 源文件、演示 EPUB 生成器与素材来源说明
 
 Chrome Web Store 最少需要 1 张 1280×800 或 640×400 截图，最多 5 张；小型宣传图为 440×280。1400×560 marquee 图和 YouTube 视频可选。
 

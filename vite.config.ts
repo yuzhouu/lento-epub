@@ -29,8 +29,9 @@ function targetHtmlPlugin(target: BuildTarget, base: string): Plugin {
     name: 'lento-target-html',
     transformIndexHtml(html) {
       const webHead = `
-    <link rel="icon" href="${base}icons/lento.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="${base}icons/lento-128.png" />
+    <link rel="icon" href="${base}icons/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="${base}icons/lento.svg" type="image/svg+xml" sizes="any" />
+    <link rel="apple-touch-icon" href="${base}icons/lento-180.png" sizes="180x180" />
     <link rel="manifest" href="${base}manifest.webmanifest" />`
 
       return html.replace(

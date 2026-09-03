@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
   <title id="title">卷舍 · Lento</title>
-  <rect x="4" y="4" width="120" height="120" rx="27" fill="#315d4b"/>
+  <rect width="128" height="128" fill="#315d4b"/>
   <path d="M24 36c14.8 0 28 4.6 40 14.6V97C52 88 38.8 83.5 24 83.5V36Z" fill="#f5f2eb"/>
   <path d="M104 36c-14.8 0-28 4.6-40 14.6V97c12-9 25.2-13.5 40-13.5V36Z" fill="#f5f2eb"/>
   <path d="M64 51v45" fill="none" stroke="#315d4b" stroke-width="4" stroke-linecap="round"/>

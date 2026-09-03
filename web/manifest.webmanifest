@@ -18,8 +18,8 @@
       },
       "icons": [
         {
-          "src": "icons/lento-128.png",
-          "sizes": "128x128",
+          "src": "icons/lento-192.png",
+          "sizes": "192x192",
           "type": "image/png"
         }
       ],
@@ -29,21 +29,27 @@
   "icons": [
     {
       "src": "icons/lento.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/lento-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/lento.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/lento-128.png",
-      "sizes": "128x128",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "icons/lento-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/lento-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
