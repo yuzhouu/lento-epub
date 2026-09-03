@@ -26,13 +26,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - id: pages
+        uses: actions/configure-pages@v5
       - run: npm ci
       - run: npm run test
       - run: npm run typecheck
       - run: npm run build:web
         env:
-          LENTO_BASE_PATH: /lento-epub/
-      - uses: actions/configure-pages@v5
+          LENTO_BASE_PATH: ${{ steps.pages.outputs.base_path }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/web
