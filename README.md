@@ -1,74 +1,51 @@
-# 卷舍 · Lento
+<p align="center">
+  <img src="public/icons/lento-128.png" width="96" height="96" alt="Lento icon">
+</p>
 
-> 把时间留给书。
-> Read without hurry.
+<h1 align="center">Lento</h1>
 
-一个简洁的 EPUB 阅读器，同时提供独立网站与 Chrome MV3 扩展。书本与阅读进度仅保存在当前浏览器的 IndexedDB 中，不会上传到远程服务。
+<p align="center">
+  <strong>A calm, private EPUB reader for the browser.</strong><br>
+  Make time for books. Read without hurry.
+</p>
 
-## 本地开发
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="PRIVACY.md">Privacy</a> ·
+  <a href="https://github.com/yuzhouu/lento-epub/issues">Feedback</a>
+</p>
 
-```bash
-npm install
-npm run dev
-```
+![The Lento library](store/assets/screenshot-library-1280x800.png)
 
-## 构建
+Lento brings your EPUB library and reading space together in one quiet, uncluttered place. Import your own books, arrange them the way you think, and return to the exact place where you stopped—without creating an account or sending your reading life to a server.
 
-```bash
-npm run build
-```
+## Your books, thoughtfully organized
 
-这会分别生成：
+- Add several EPUB files at once by choosing or dropping them
+- See titles, authors, and covers read directly from book metadata
+- Search by title or author, then sort by recent reading, date added, or progress
+- Organize books with reading states, favorites, and custom tags
+- Detect duplicate content before it clutters your shelf
 
-- `dist/web`：可部署到任意静态托管服务的网站与 PWA
-- `dist/extension`：可加载到 Chrome 的 MV3 扩展
+## A reading space that adapts to you
 
-也可以单独构建：
+![The Lento reader](store/assets/screenshot-reader-1280x800.png)
 
-```bash
-npm run build:web
-npm run build:extension
-```
+Choose chapter scrolling, continuous scrolling, or traditional pagination. Fine-tune the font, type size, line spacing, text width, paragraph style, and paper theme until the page feels right. Lento keeps the table of contents, full-book search, and reading progress close without crowding the text.
 
-### 部署独立网站
+The interface adapts to desktop and mobile widths and is available in English, Simplified Chinese, Japanese, Russian, French, and Spanish.
 
-托管平台的构建命令使用 `npm run build:web`，发布目录设置为 `dist/web`。网站使用 Hash 路由，不需要额外配置 SPA 回退。
+## Keep what matters
 
-若网站部署在域名子目录下，通过 `LENTO_BASE_PATH` 指定公开路径：
+Bookmark a page or select a passage to add a colored highlight and note. Review everything by book, then export your reading records as Markdown or plain text whenever you want to use them elsewhere.
 
-```bash
-LENTO_BASE_PATH=/lento/ npm run build:web
-```
+## Local first, by design
 
-网站构建包含 Web App Manifest 和按实际构建产物生成的 Service Worker。首次在线打开后，应用外壳与阅读器资源可以离线使用；支持的浏览器还会显示“安装应用”入口。
+Your EPUB files, reading position, progress, bookmarks, highlights, notes, and preferences stay in your browser. Lento has no account system, ads, or behavioral analytics, and it does not upload your books or reading records.
 
-### 加载 Chrome 扩展
+When it is time to change browsers or devices, export a `.lento` backup containing your books and reading data. Restore it into the new library, review any conflicts, and choose whether to replace, keep both, or skip each book.
 
-在 `chrome://extensions` 开启“开发者模式”，选择“加载已解压的扩展程序”，加载项目中的 `dist/extension` 目录。点击工具栏中的卷舍图标即可打开阅读器。
+## Read in the way that fits
 
-### 发布 Chrome 扩展
-
-```bash
-npm run release:extension
-```
-
-命令会依次运行测试、类型检查、扩展构建与商店素材校验，并生成可直接上传的 `release/chrome-web-store/lento-epub-reader-<version>.zip`。ZIP 根目录包含 `manifest.json`。
-
-可直接粘贴到 Developer Dashboard 的商店文案、隐私披露、审核说明和素材清单见 [`store/README.md`](store/README.md)。公开隐私政策同时提供为应用内 `#/privacy` 页面和 [`PRIVACY.md`](PRIVACY.md)。
-
-## 当前能力
-
-- 批量选择或拖放导入本地 `.epub` 文件，并检测内容重复的书籍
-- 在支持的桌面浏览器中安装 PWA 后，可从系统的“打开方式”中选择卷舍直接打开 `.epub`
-- 从 EPUB 元数据读取书名、作者与封面
-- 本地保存书本、阅读位置与进度
-- 按书名或作者搜索，并按最近阅读、添加时间或阅读进度排序
-- 管理未读、在读、读完状态，以及收藏和自定义标签；这些信息会随书库备份迁移
-- 为当前页添加书签，在正文中保存多色划线与批注，并按书集中查看或导出 Markdown / 纯文本
-- 删除书籍及其本地 EPUB 文件，支持删除确认与 8 秒撤销
-- 导出与恢复包含 EPUB、书籍信息和阅读进度的 `.lento` 书库备份，恢复前可预览冲突并逐本选择覆盖、保留两本或跳过
-- 目录跳转、翻页、字号与纸张主题
-- 桌面与移动宽度适配
-- 独立网站安装与离线应用外壳
-
-网站、扩展以及不同域名各自拥有独立的浏览器存储。需要迁移时，先在原环境导出书库备份，再在新环境恢复；恢复操作会先预览冲突，再按你的选择合并书架，不会删除其他书籍。
+Lento is available as a standalone web app, an installable PWA with an offline app shell, and a Chrome extension. Each installation keeps its own separate local library, so your data only moves when you choose to export and restore it.
