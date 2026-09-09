@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   saveReadingAsset,
@@ -49,6 +56,18 @@ interface ReaderPageProps {
   bookRecord: BookRecord
   onBack: () => void
   onBookUpdate: (book: BookRecord) => void
+}
+
+const DEFAULT_READER_SIDEBAR_WIDTH = 340
+const MIN_READER_SIDEBAR_WIDTH = 240
+const MAX_READER_SIDEBAR_WIDTH = 520
+const MIN_READER_MAIN_WIDTH = 420
+const SIDEBAR_RESIZE_STEP = 16
+
+interface SidebarResizeState {
+  pointerId: number
+  startX: number
+  startWidth: number
 }
 
 export function ReaderPage({
@@ -104,6 +123,10 @@ export function ReaderPage({
   const [navigationPanel, setNavigationPanel] =
     useState<NavigationPanel>('toc')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(
+    DEFAULT_READER_SIDEBAR_WIDTH,
+  )
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false)
   const [pendingSelection, setPendingSelection] = useState<PendingSelection>()
   const [pendingNote, setPendingNote] = useState('')
   const [pendingColor, setPendingColor] = useState<ReadingHighlightColor>()
@@ -112,12 +135,78 @@ export function ReaderPage({
   const [isSavingSelection, setIsSavingSelection] = useState(false)
   const tocOpenRef = useRef(tocOpen)
   const navigationPanelRef = useRef(navigationPanel)
+  const sidebarResizeRef = useRef<SidebarResizeState | undefined>(undefined)
 
   pendingNoteRef.current = pendingNote
   pendingColorRef.current = pendingColor
   pendingLineStyleRef.current = pendingLineStyle
   tocOpenRef.current = tocOpen
   navigationPanelRef.current = navigationPanel
+
+  function getSidebarWidthBounds() {
+    return {
+      min: MIN_READER_SIDEBAR_WIDTH,
+      max: Math.min(
+        MAX_READER_SIDEBAR_WIDTH,
+        Math.max(
+          MIN_READER_SIDEBAR_WIDTH,
+          window.innerWidth - MIN_READER_MAIN_WIDTH,
+        ),
+      ),
+    }
+  }
+
+  function clampSidebarWidth(width: number) {
+    const { min, max } = getSidebarWidthBounds()
+    return Math.min(max, Math.max(min, width))
+  }
+
+  function handleSidebarResizeStart(event: ReactPointerEvent<HTMLDivElement>) {
+    if (window.innerWidth <= 780) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    sidebarResizeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: sidebarWidth,
+    }
+    setIsSidebarResizing(true)
+  }
+
+  function handleSidebarResizeMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const resize = sidebarResizeRef.current
+    if (!resize || resize.pointerId !== event.pointerId) return
+    setSidebarWidth(
+      clampSidebarWidth(resize.startWidth + event.clientX - resize.startX),
+    )
+  }
+
+  function handleSidebarResizeEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    const resize = sidebarResizeRef.current
+    if (!resize || resize.pointerId !== event.pointerId) return
+    sidebarResizeRef.current = undefined
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    setIsSidebarResizing(false)
+  }
+
+  function handleSidebarResizeKeyDown(
+    event: ReactKeyboardEvent<HTMLDivElement>,
+  ) {
+    const { min, max } = getSidebarWidthBounds()
+    const currentWidth = clampSidebarWidth(sidebarWidth)
+    let nextWidth: number | undefined
+
+    if (event.key === 'ArrowLeft') nextWidth = currentWidth - SIDEBAR_RESIZE_STEP
+    if (event.key === 'ArrowRight') nextWidth = currentWidth + SIDEBAR_RESIZE_STEP
+    if (event.key === 'Home') nextWidth = min
+    if (event.key === 'End') nextWidth = max
+    if (nextWidth === undefined) return
+
+    event.preventDefault()
+    setSidebarWidth(Math.min(max, Math.max(min, nextWidth)))
+  }
 
   const reader = useEpubReader({
     bookRecord,
@@ -722,10 +811,16 @@ export function ReaderPage({
 
   const readerLayoutStyle = {
     '--reader-column-width': `${READER_WIDTHS[readerWidth]}px`,
+    '--reader-sidebar-width': `${sidebarWidth}px`,
   } as CSSProperties
 
   return (
-    <main className={`reader-page theme-${theme}`} style={readerLayoutStyle}>
+    <main
+      className={`reader-page theme-${theme}${
+        isSidebarResizing ? ' is-sidebar-resizing' : ''
+      }`}
+      style={readerLayoutStyle}
+    >
       <div
         className={
           tocOpen
@@ -771,6 +866,21 @@ export function ReaderPage({
                 onUpdateHighlight={handleUpdateHighlight}
               />
             )}
+            <div
+              className="reader-sidebar-resizer"
+              role="separator"
+              tabIndex={0}
+              aria-label={t('reader.navigation')}
+              aria-orientation="vertical"
+              aria-valuemin={MIN_READER_SIDEBAR_WIDTH}
+              aria-valuemax={getSidebarWidthBounds().max}
+              aria-valuenow={Math.round(sidebarWidth)}
+              onKeyDown={handleSidebarResizeKeyDown}
+              onPointerCancel={handleSidebarResizeEnd}
+              onPointerDown={handleSidebarResizeStart}
+              onPointerMove={handleSidebarResizeMove}
+              onPointerUp={handleSidebarResizeEnd}
+            />
             <button
               className="toc-backdrop"
               type="button"

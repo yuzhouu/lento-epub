@@ -1753,13 +1753,14 @@
 }
 
 .reader-layout.toc-is-open {
-  grid-template-columns: 340px minmax(0, 1fr);
+  position: relative;
+  grid-template-columns: var(--reader-sidebar-width, 340px) minmax(0, 1fr);
 }
 
 .toc-panel {
   height: 100svh;
   overflow: hidden;
-  border-right: 1px solid var(--reader-border);
+  border-right: 0;
   background: var(--reader-sidebar);
   position: relative;
   z-index: 20;
@@ -1770,6 +1771,55 @@
 .theme-night .toc-panel {
   border-color: rgba(235, 231, 219, 0.12);
   background: var(--reader-sidebar);
+}
+
+.reader-sidebar-resizer {
+  position: absolute;
+  z-index: 24;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--reader-sidebar-width, 340px) - 4px);
+  width: 8px;
+  touch-action: none;
+  cursor: col-resize;
+}
+
+.reader-sidebar-resizer::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: var(--reader-border);
+  content: '';
+  transition:
+    background-color 140ms ease,
+    left 140ms ease,
+    width 140ms ease;
+}
+
+.reader-sidebar-resizer:hover::before,
+.reader-sidebar-resizer:focus-visible::before,
+.is-sidebar-resizing .reader-sidebar-resizer::before {
+  left: 2px;
+  width: 4px;
+  background: rgba(49, 93, 75, 0.32);
+}
+
+.reader-sidebar-resizer:focus-visible {
+  outline: 0;
+}
+
+.theme-night .reader-sidebar-resizer:hover::before,
+.theme-night .reader-sidebar-resizer:focus-visible::before,
+.theme-night.is-sidebar-resizing .reader-sidebar-resizer::before {
+  background: rgba(157, 195, 174, 0.42);
+}
+
+.is-sidebar-resizing,
+.is-sidebar-resizing * {
+  user-select: none;
+  cursor: col-resize !important;
 }
 
 .toc-header {
@@ -2529,7 +2579,7 @@
   left: clamp(28px, 4vw, 58px);
   height: 2px;
   overflow: hidden;
-  background: var(--reader-border);
+  background: color-mix(in srgb, var(--reader-border) 58%, transparent);
 }
 
 .reader-progress span {
@@ -2569,6 +2619,10 @@
 @media (max-width: 780px) {
   .reader-layout.toc-is-open {
     grid-template-columns: 1fr;
+  }
+
+  .reader-sidebar-resizer {
+    display: none;
   }
 
   .toc-panel {
