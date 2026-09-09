@@ -2675,7 +2675,7 @@
   }
 
   .reader-header {
-    height: 60px;
+    height: 52px;
     gap: 10px;
     padding: 0 12px;
   }
@@ -2711,14 +2711,20 @@
   }
 
   .reader-stage {
-    height: calc(100svh - 108px);
+    height: calc(100svh - 84px);
     padding: 0 4px;
   }
 
   .reader-footer {
     right: 10px;
-    bottom: 7px;
+    bottom: 2px;
     left: 10px;
+    min-height: 28px;
+  }
+
+  .reader-footer button {
+    min-height: 28px;
+    border-radius: 6px;
   }
 
   .chapter-boundary-label {
