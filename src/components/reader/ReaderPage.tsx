@@ -63,6 +63,11 @@ const MIN_READER_SIDEBAR_WIDTH = 240
 const MAX_READER_SIDEBAR_WIDTH = 520
 const MIN_READER_MAIN_WIDTH = 420
 const SIDEBAR_RESIZE_STEP = 16
+const READER_DRAWER_BREAKPOINT = 780
+
+function isReaderDrawerViewport() {
+  return window.innerWidth <= READER_DRAWER_BREAKPOINT
+}
 
 interface SidebarResizeState {
   pointerId: number
@@ -162,7 +167,7 @@ export function ReaderPage({
   }
 
   function handleSidebarResizeStart(event: ReactPointerEvent<HTMLDivElement>) {
-    if (window.innerWidth <= 780) return
+    if (isReaderDrawerViewport()) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     sidebarResizeRef.current = {
@@ -728,7 +733,7 @@ export function ReaderPage({
     dismissPendingSelection()
     setActiveAssetId(asset.id)
     void renditionRef.current?.display(asset.cfi)
-    if (window.innerWidth < 780) setTocOpen(false)
+    if (isReaderDrawerViewport()) setTocOpen(false)
   }
 
   const currentBookmark = readingAssets.find(
@@ -768,14 +773,14 @@ export function ReaderPage({
   function displayChapter(href: string) {
     dismissPendingSelection()
     displayReaderChapter(href)
-    if (window.innerWidth < 980) setTocOpen(false)
+    if (isReaderDrawerViewport()) setTocOpen(false)
   }
 
   function displaySearchResult(result: BookSearchResult) {
     dismissPendingSelection()
     resetChapterBoundary()
     void renditionRef.current?.display(result.cfi)
-    if (window.innerWidth < 980) setTocOpen(false)
+    if (isReaderDrawerViewport()) setTocOpen(false)
   }
 
   function handleReaderFlowChange(flow: ReaderFlow) {
@@ -894,7 +899,6 @@ export function ReaderPage({
 
         <section className="reader-main">
           <ReaderHeader
-            title={bookRecord.title}
             chapterLabel={chapterLabel}
             navigationOpen={tocOpen}
             navigationPanel={navigationPanel}

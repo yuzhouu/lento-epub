@@ -15,7 +15,6 @@ import type { ReaderFlow } from '../model/reader-preferences'
 import type { NavigationPanel } from '../model/reader-navigation'
 
 interface ReaderHeaderProps {
-  title: string
   chapterLabel?: string
   navigationOpen: boolean
   navigationPanel: NavigationPanel
@@ -34,7 +33,6 @@ interface ReaderHeaderProps {
 }
 
 export function ReaderHeader({
-  title,
   chapterLabel,
   navigationOpen,
   navigationPanel,
@@ -66,9 +64,9 @@ export function ReaderHeader({
             <span className="visually-hidden">{t('reader.openNavigation')}</span>
           </button>
         ) : null}
-        <strong title={title}>{title}</strong>
-        <span aria-hidden="true">/</span>
-        <span title={chapterLabel}>{chapterLabel || t('reader.opening')}</span>
+        <strong title={chapterLabel}>
+          {chapterLabel || t('reader.opening')}
+        </strong>
       </div>
       <div className="reader-tools">
         {!navigationOpen ? (
