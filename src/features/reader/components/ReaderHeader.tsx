@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 import {
   Bookmark,
+  House,
   List,
   NotebookPen,
   PanelLeftOpen,
@@ -24,6 +25,7 @@ interface ReaderHeaderProps {
   settingsOpen: boolean
   settingsAnchorRef: RefObject<HTMLDivElement | null>
   preferences: ReaderPreferenceController
+  onBack: () => void
   onOpenNavigation: () => void
   onNavigationToggle: (panel: NavigationPanel) => void
   onBookmarkToggle: () => void
@@ -42,6 +44,7 @@ export function ReaderHeader({
   settingsOpen,
   settingsAnchorRef,
   preferences,
+  onBack,
   onOpenNavigation,
   onNavigationToggle,
   onBookmarkToggle,
@@ -68,6 +71,17 @@ export function ReaderHeader({
         <span title={chapterLabel}>{chapterLabel || t('reader.opening')}</span>
       </div>
       <div className="reader-tools">
+        {!navigationOpen ? (
+          <button
+            className="reader-tool-button"
+            type="button"
+            onClick={onBack}
+            title={t('common.backToLibrary')}
+          >
+            <House aria-hidden="true" size={18} strokeWidth={1.7} />
+            <span>{t('common.backToLibrary')}</span>
+          </button>
+        ) : null}
         <button
           className="reader-tool-button"
           type="button"

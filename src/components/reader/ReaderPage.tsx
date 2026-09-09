@@ -792,6 +792,7 @@ export function ReaderPage({
             settingsOpen={settingsOpen}
             settingsAnchorRef={settingsAnchorRef}
             preferences={preferences}
+            onBack={onBack}
             onOpenNavigation={() => setTocOpen(true)}
             onNavigationToggle={handleNavigationToggle}
             onBookmarkToggle={() => void handleToggleBookmark()}
