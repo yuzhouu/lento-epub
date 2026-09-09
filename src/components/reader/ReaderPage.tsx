@@ -955,6 +955,7 @@ export function ReaderPage({
 
           <ReaderFooter
             flow={readerFlow}
+            chapterLabel={chapterLabel}
             chapterPercent={chapterPercent}
             atChapterEnd={atChapterEnd}
             previousChapter={previousChapter}

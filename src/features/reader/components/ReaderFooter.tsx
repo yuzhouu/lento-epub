@@ -5,6 +5,7 @@ import type { ReaderFlow } from '../model/reader-preferences'
 
 interface ReaderFooterProps {
   flow: ReaderFlow
+  chapterLabel?: string
   chapterPercent: number
   atChapterEnd: boolean
   previousChapter?: TocItem
@@ -18,6 +19,7 @@ interface ReaderFooterProps {
 
 export function ReaderFooter({
   flow,
+  chapterLabel,
   chapterPercent,
   atChapterEnd,
   previousChapter,
@@ -65,12 +67,20 @@ export function ReaderFooter({
             </span>
           </button>
         ) : null}
-        <span
-          className="reader-chapter-progress"
-          aria-label={t('reader.footer.chapterProgress', { percent: chapterPercent })}
-        >
-          {chapterPercent}%
-        </span>
+        <div className="reader-footer-current">
+          <span
+            className="reader-footer-chapter"
+            title={chapterLabel}
+          >
+            {chapterLabel || t('reader.opening')}
+          </span>
+          <span
+            className="reader-chapter-progress"
+            aria-label={t('reader.footer.chapterProgress', { percent: chapterPercent })}
+          >
+            {chapterPercent}%
+          </span>
+        </div>
         {flow === 'paginated' ? (
           <button
             className={offerNextChapter ? 'chapter-next-button' : ''}

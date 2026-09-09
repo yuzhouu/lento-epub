@@ -66,7 +66,7 @@ export function ReaderHeader({
             <span className="visually-hidden">{t('reader.openNavigation')}</span>
           </button>
         ) : null}
-        <strong>{title}</strong>
+        <strong title={title}>{title}</strong>
         <span aria-hidden="true">/</span>
         <span title={chapterLabel}>{chapterLabel || t('reader.opening')}</span>
       </div>

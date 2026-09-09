@@ -2559,17 +2559,45 @@
   grid-column: 3;
 }
 
+.reader-footer-current {
+  min-width: 0;
+  display: contents;
+  grid-column: 2;
+  pointer-events: none;
+}
+
+.reader-footer-chapter {
+  display: none;
+  width: auto;
+  overflow: hidden;
+  color: var(--reader-muted);
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.72;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chapter-boundary-label {
   color: var(--reader-muted);
   font-weight: 400;
 }
 
-.reader-footer > span {
+.reader-footer-current > span {
   font-family: inherit;
-  font-size: 12px;
   font-variant-numeric: tabular-nums;
-  opacity: 1;
   color: var(--reader-muted);
+}
+
+.reader-footer-current .reader-chapter-progress {
+  grid-column: 2;
+  font-size: 12px;
+  opacity: 1;
+}
+
+.reader-footer-current .reader-footer-chapter {
+  grid-column: 2;
 }
 
 .reader-progress {
@@ -2656,14 +2684,6 @@
     gap: 7px;
   }
 
-  .reader-context strong {
-    max-width: 25vw;
-  }
-
-  .reader-context > span:last-child {
-    max-width: 28vw;
-  }
-
   .reader-tools {
     gap: 4px;
   }
@@ -2712,13 +2732,10 @@
 }
 
 @media (max-width: 780px) {
+  .reader-context strong,
   .reader-context > span[aria-hidden='true'],
   .reader-context > span:last-child {
     display: none;
-  }
-
-  .reader-context strong {
-    max-width: 20vw;
   }
 
   .reader-tools {
@@ -2728,6 +2745,37 @@
   .reader-tool-button {
     width: 34px;
     min-height: 34px;
+  }
+
+  .reader-footer-current {
+    width: min(72vw, 520px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 11px;
+  }
+
+  .reader-footer.is-paginated .reader-footer-current,
+  .reader-footer.is-chapter-start:not(.is-paginated) .reader-footer-current,
+  .reader-footer.is-chapter-end:not(.is-paginated) .reader-footer-current {
+    max-width: calc(100% - 112px);
+  }
+
+  .reader-footer-current .reader-footer-chapter {
+    display: block;
+    min-width: 0;
+    max-width: calc(100% - 34px);
+    color: var(--reader-muted);
+    opacity: 0.72;
+    text-align: center;
+  }
+
+  .reader-footer-current .reader-chapter-progress {
+    flex: none;
+    grid-column: auto;
+    color: var(--reader-muted);
+    font-size: 10px;
+    opacity: 0.58;
   }
 
   .reading-asset-delete {
