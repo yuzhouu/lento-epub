@@ -30,6 +30,7 @@ interface SearchProgress {
 
 interface BookSearchPanelProps {
   bookId: string
+  title: string
   onBack: () => void
   onClose: () => void
   onSearch: (
@@ -134,6 +135,7 @@ function HighlightedExcerpt({ text, query }: { text: string; query: string }) {
 
 export function BookSearchPanel({
   bookId,
+  title,
   onBack,
   onClose,
   onSearch,
@@ -222,7 +224,7 @@ export function BookSearchPanel({
   return (
     <aside className="toc-panel book-search-panel" aria-label={t('reader.search.label')}>
       <div className="toc-header">
-        <strong>{t('common.brandShort')}</strong>
+        <strong title={title}>{title}</strong>
         <button className="sidebar-toggle" type="button" onClick={onClose}>
           <PanelLeftClose aria-hidden="true" size={19} strokeWidth={1.7} />
           <span className="visually-hidden">{t('reader.search.close')}</span>

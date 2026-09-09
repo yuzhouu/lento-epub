@@ -832,6 +832,7 @@ export function ReaderPage({
           <>
             {navigationPanel === 'toc' ? (
               <TocPanel
+                title={bookRecord.title}
                 items={toc}
                 currentHref={currentHref}
                 onBack={onBack}
@@ -843,6 +844,7 @@ export function ReaderPage({
             ) : navigationPanel === 'search' ? (
               <BookSearchPanel
                 bookId={bookRecord.id}
+                title={bookRecord.title}
                 onBack={onBack}
                 onClose={() => setTocOpen(false)}
                 onSearch={epubSearch.search}

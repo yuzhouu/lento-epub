@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import type { TocItem } from '../../types/book'
 
 interface TocPanelProps {
+  title: string
   items: TocItem[]
   currentHref?: string
   onBack: () => void
@@ -60,6 +61,7 @@ function TocEntries({
 }
 
 export function TocPanel({
+  title,
   items,
   currentHref,
   onBack,
@@ -73,7 +75,7 @@ export function TocPanel({
   return (
     <aside className="toc-panel" aria-label={t('reader.toc.label')}>
       <div className="toc-header">
-        <strong>{t('common.brandShort')}</strong>
+        <strong title={title}>{title}</strong>
         <button className="sidebar-toggle" type="button" onClick={onClose}>
           <PanelLeftClose aria-hidden="true" size={19} strokeWidth={1.7} />
           <span className="visually-hidden">{t('reader.toc.close')}</span>

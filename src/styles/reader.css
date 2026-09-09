@@ -1758,6 +1758,7 @@
 }
 
 .toc-panel {
+  min-width: 0;
   height: 100svh;
   overflow: hidden;
   border-right: 0;
@@ -1823,14 +1824,21 @@
 }
 
 .toc-header {
+  min-width: 0;
   height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 18px 0 28px;
+  overflow: hidden;
 }
 
 .toc-header strong {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--serif);
   font-size: 21px;
   font-weight: 600;

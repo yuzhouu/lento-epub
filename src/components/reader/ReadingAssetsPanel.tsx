@@ -115,7 +115,7 @@ export function ReadingAssetsPanel({
       aria-label={t('reader.assets.panelLabel', { title: book.title })}
     >
       <div className="toc-header">
-        <strong>{t('common.brandShort')}</strong>
+        <strong title={book.title}>{book.title}</strong>
         <button className="sidebar-toggle" type="button" onClick={onClose}>
           <PanelLeftClose aria-hidden="true" size={19} strokeWidth={1.7} />
           <span className="visually-hidden">{t('reader.assets.close')}</span>
