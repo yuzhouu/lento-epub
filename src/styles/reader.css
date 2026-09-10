@@ -2762,26 +2762,67 @@
   }
 
   .reader-footer-current {
-    width: min(72vw, 520px);
-    display: inline-flex;
+    position: absolute;
+    inset: 0;
+    width: auto;
+    max-width: none;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 11px;
+    pointer-events: none;
   }
 
-  .reader-footer.is-paginated .reader-footer-current,
-  .reader-footer.is-chapter-start:not(.is-paginated) .reader-footer-current,
-  .reader-footer.is-chapter-end:not(.is-paginated) .reader-footer-current {
-    max-width: calc(100% - 112px);
+  .reader-footer.is-chapter-start:not(.is-paginated),
+  .reader-footer.is-chapter-end:not(.is-paginated) {
+    display: block;
+  }
+
+  .reader-footer.is-paginated {
+    display: block;
+    pointer-events: auto;
+  }
+
+  .reader-footer .chapter-previous-button,
+  .reader-footer .chapter-next-button {
+    z-index: 1;
+    background: linear-gradient(var(--reader-hover), var(--reader-hover)),
+      var(--reader-surface);
+  }
+
+  .reader-footer.is-chapter-start:not(.is-paginated) .chapter-previous-button,
+  .reader-footer.is-chapter-end:not(.is-paginated) .chapter-next-button,
+  .reader-footer.is-paginated > button:first-child,
+  .reader-footer.is-paginated > button:last-child {
+    position: absolute;
+    top: 50%;
+    min-width: 0;
+    padding-inline: 6px;
+    font-size: 10px;
+    transform: translateY(-50%);
+  }
+
+  .reader-footer.is-chapter-start:not(.is-paginated) .chapter-previous-button,
+  .reader-footer.is-paginated > button:first-child {
+    left: 0;
+  }
+
+  .reader-footer.is-chapter-end:not(.is-paginated) .chapter-next-button,
+  .reader-footer.is-paginated > button:last-child {
+    right: 0;
   }
 
   .reader-footer-current .reader-footer-chapter {
     display: block;
-    min-width: 0;
-    max-width: calc(100% - 34px);
+    flex: 0 0 auto;
+    min-width: auto;
+    max-width: none;
+    overflow: visible;
     color: var(--reader-muted);
     opacity: 0.72;
     text-align: center;
+    text-overflow: clip;
+    white-space: nowrap;
   }
 
   .reader-footer-current .reader-chapter-progress {
