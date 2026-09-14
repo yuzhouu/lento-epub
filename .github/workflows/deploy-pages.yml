@@ -34,6 +34,7 @@ jobs:
       - run: npm run build:web
         env:
           LENTO_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          LENTO_SITE_URL: ${{ steps.pages.outputs.base_url }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist/web

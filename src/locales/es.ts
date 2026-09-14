@@ -3,7 +3,11 @@ export const es = {
     brand: 'Lento', brandShort: 'Lento', tagline: 'Guarda tiempo para los libros.', slogan: 'Lee sin prisas.', backToLibrary: 'Volver a la biblioteca', toc: 'Índice', search: 'Buscar', excerpts: 'Notas', cancel: 'Cancelar', clear: 'Borrar', close: 'Cerrar', delete: 'Eliminar', manage: 'Gestionar', favorite: 'Favoritos', loading: 'Cargando…', loadFailed: 'Error al cargar', refreshing: 'Actualizar', add: 'Añadir', all: 'Todo', privacy: 'Privacidad', about: 'Acerca de', books_one: '{{count}} libro', books_other: '{{count}} libros', items_one: '{{count}} elemento', items_other: '{{count}} elementos',
   },
   language: { label: 'Idioma', select: 'Seleccionar el idioma de la interfaz' },
-  app: { aboutTitle: 'Acerca de · Lento', privacyTitle: 'Política de privacidad · Lento', homeTitle: 'Lento', opening: 'Abriendo…' },
+  seo: {
+    description: "Lento es un lector EPUB local con biblioteca, búsqueda completa, marcadores, resaltados y notas. Sin registro: los libros y los registros de lectura permanecen en este navegador.",
+    javascriptNotice: "Activa JavaScript para importar y leer EPUB. La información del producto y la política de privacidad siguen disponibles.",
+  },
+  app: { aboutTitle: 'Acerca de · Lento', privacyTitle: 'Política de privacidad · Lento', homeTitle: "Lento — Lector EPUB, biblioteca local y notas", opening: 'Abriendo…' },
   library: {
     heading: 'Mi biblioteca', productInfo: 'Información del producto', searchEmptyTitle: 'No hay libros que coincidan', searchEmptyBody: 'Prueba otra palabra o borra los filtros actuales.', clearFilters: 'Borrar filtros', emptyTitle: 'Tu biblioteca está vacía', emptyBody: 'Elige o arrastra archivos EPUB para empezar.', dropTitle: 'Suelta para añadir los EPUB', dropBody: 'Puedes añadir varios libros a la vez', dismissNotice: 'Cerrar notificación', deleted: 'Se eliminó «{{title}}».', undo: 'Deshacer', updateFailed: 'No se pudo actualizar el libro.',
     toolbar: { label: 'Gestionar biblioteca', search: 'Buscar por título o autor', sort: 'Ordenar', filterStatus: 'Filtrar por estado de lectura', filterTags: 'Filtrar por etiqueta', tags: 'Etiquetas', sortRecent: 'Leídos recientemente', sortAdded: 'Fecha de adición', sortProgress: 'Progreso de lectura' },

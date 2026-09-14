@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://yuzhouu.github.io/lento-epub/">在线阅读</a> ·
   <a href="README.md">English</a> ·
   <a href="README.zh-CN.md">简体中文</a> ·
   <a href="PRIVACY.md">隐私政策</a> ·
@@ -49,3 +50,11 @@ EPUB 文件、阅读位置、进度、书签、划线、批注与偏好都留在
 ## 用适合自己的方式打开
 
 卷舍提供独立网站、可安装且支持离线应用外壳的 PWA，以及 Chrome 扩展。每个安装环境都有彼此独立的本地书架，只有在你主动导出并恢复备份时，数据才会移动。
+
+## 网站构建与收录
+
+`npm run build:web` 会在 `dist/web` 生成首页、`about/` 和 `privacy/` 的完整 HTML，以及网站地图、抓取配置和离线缓存。阅读器仍使用本地书库和书籍地址；书籍、阅读记录不会进入网站地图。
+
+GitHub Pages 工作流自动传入 `LENTO_BASE_PATH` 和 `LENTO_SITE_URL`。部署到其他域名时，将 `LENTO_SITE_URL` 设为网站完整 HTTPS 地址（包含部署子路径），并设置对应的 `LENTO_BASE_PATH`。构建会校验正文、规范网址、静态资源和网站地图，阻止本机地址或错误链接进入产物。
+
+当前网站地图地址为 `https://yuzhouu.github.io/lento-epub/sitemap.xml`。子目录内的 `robots.txt` 不控制整个域名；域名根站的 `robots.txt` 需要列出这份网站地图。发布后，在 Google Search Console、Bing Webmaster Tools 等站长平台验证网站所有权，提交网站地图，并通过 URL 检查确认实际收录状态。

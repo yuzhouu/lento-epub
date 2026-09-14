@@ -3,7 +3,11 @@ export const fr = {
     brand: 'Lento', brandShort: 'Lento', tagline: 'Gardez du temps pour les livres.', slogan: 'Lisez sans vous presser.', backToLibrary: 'Retour à la bibliothèque', toc: 'Sommaire', search: 'Rechercher', excerpts: 'Notes', cancel: 'Annuler', clear: 'Effacer', close: 'Fermer', delete: 'Supprimer', manage: 'Gérer', favorite: 'Favoris', loading: 'Chargement…', loadFailed: 'Échec du chargement', refreshing: 'Actualiser', add: 'Ajouter', all: 'Tout', privacy: 'Confidentialité', about: 'À propos', books_one: '{{count}} livre', books_other: '{{count}} livres', items_one: '{{count}} élément', items_other: '{{count}} éléments',
   },
   language: { label: 'Langue', select: "Choisir la langue de l’interface" },
-  app: { aboutTitle: 'À propos · Lento', privacyTitle: 'Politique de confidentialité · Lento', homeTitle: 'Lento', opening: 'Ouverture…' },
+  seo: {
+    description: "Lento est un lecteur EPUB local avec bibliothèque, recherche intégrale, signets, surlignages et notes. Sans compte : vos livres et votre lecture restent dans ce navigateur.",
+    javascriptNotice: "Activez JavaScript pour importer et lire des EPUB. La présentation et la politique de confidentialité restent accessibles.",
+  },
+  app: { aboutTitle: 'À propos · Lento', privacyTitle: 'Politique de confidentialité · Lento', homeTitle: "Lento — Lecteur EPUB, bibliothèque locale et notes", opening: 'Ouverture…' },
   library: {
     heading: 'Ma bibliothèque', productInfo: 'Informations produit', searchEmptyTitle: 'Aucun livre correspondant', searchEmptyBody: 'Essayez un autre mot-clé ou effacez les filtres.', clearFilters: 'Effacer les filtres', emptyTitle: 'Votre bibliothèque est vide', emptyBody: 'Choisissez ou déposez des fichiers EPUB pour commencer.', dropTitle: 'Déposez pour ajouter les EPUB', dropBody: 'Vous pouvez ajouter plusieurs livres à la fois', dismissNotice: 'Fermer la notification', deleted: '« {{title}} » a été supprimé.', undo: 'Annuler', updateFailed: 'Impossible de mettre à jour le livre.',
     toolbar: { label: 'Gérer la bibliothèque', search: 'Rechercher par titre ou auteur', sort: 'Trier', filterStatus: 'Filtrer par état de lecture', filterTags: 'Filtrer par étiquette', tags: 'Étiquettes', sortRecent: 'Lecture récente', sortAdded: "Date d’ajout", sortProgress: 'Progression' },

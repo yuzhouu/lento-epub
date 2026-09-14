@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './i18n'
 import { App } from './App'
+import { normalizeLegacyPublicRoute } from './lib/app-route'
 import { initializeEpubFileHandling } from './features/library/model/epub-file-launch'
 import './styles/base.css'
 import './styles/about.css'
@@ -20,8 +21,10 @@ if (__LENTO_BUILD_TARGET__ === 'web') {
   }
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+if (!normalizeLegacyPublicRoute()) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}

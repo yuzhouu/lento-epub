@@ -3,7 +3,11 @@ export const ru = {
     brand: 'Lento', brandShort: 'Lento', tagline: 'Оставьте время для книг.', slogan: 'Читайте не спеша.', backToLibrary: 'Вернуться в библиотеку', toc: 'Содержание', search: 'Поиск', excerpts: 'Заметки', cancel: 'Отмена', clear: 'Очистить', close: 'Закрыть', delete: 'Удалить', manage: 'Управление', favorite: 'Избранное', loading: 'Загрузка…', loadFailed: 'Ошибка загрузки', refreshing: 'Обновить', add: 'Добавить', all: 'Все', privacy: 'Конфиденциальность', about: 'О Lento', books_one: '{{count}} книга', books_few: '{{count}} книги', books_many: '{{count}} книг', books_other: '{{count}} книги', items_one: '{{count}} запись', items_few: '{{count}} записи', items_many: '{{count}} записей', items_other: '{{count}} записи',
   },
   language: { label: 'Язык', select: 'Выберите язык интерфейса' },
-  app: { aboutTitle: 'О Lento', privacyTitle: 'Политика конфиденциальности · Lento', homeTitle: 'Lento', opening: 'Открываем…' },
+  seo: {
+    description: "Lento — EPUB-ридер с локальной библиотекой, полнотекстовым поиском, закладками, выделениями и заметками. Без регистрации: книги и записи остаются в этом браузере.",
+    javascriptNotice: "Включите JavaScript для импорта и чтения EPUB. Информация о продукте и политика конфиденциальности доступны без него.",
+  },
+  app: { aboutTitle: 'О Lento', privacyTitle: 'Политика конфиденциальности · Lento', homeTitle: "Lento — EPUB-ридер, локальная библиотека и заметки", opening: 'Открываем…' },
   library: {
     heading: 'Моя библиотека', productInfo: 'Информация о продукте', searchEmptyTitle: 'Подходящих книг нет', searchEmptyBody: 'Попробуйте другой запрос или сбросьте фильтры.', clearFilters: 'Сбросить фильтры', emptyTitle: 'Библиотека пока пуста', emptyBody: 'Выберите или перетащите файлы EPUB, чтобы начать.', dropTitle: 'Отпустите, чтобы добавить EPUB', dropBody: 'Можно добавить несколько книг сразу', dismissNotice: 'Закрыть уведомление', deleted: 'Книга «{{title}}» удалена.', undo: 'Отменить', updateFailed: 'Не удалось обновить сведения о книге.',
     toolbar: { label: 'Управление библиотекой', search: 'Поиск по названию или автору', sort: 'Сортировка', filterStatus: 'Фильтр по статусу чтения', filterTags: 'Фильтр по тегу', tags: 'Теги', sortRecent: 'Недавно читали', sortAdded: 'Дата добавления', sortProgress: 'Прогресс чтения' },

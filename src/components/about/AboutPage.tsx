@@ -1,3 +1,4 @@
+import { getPageHref } from '../../lib/app-route'
 import {
   ArrowLeft,
   BookMarked,
@@ -43,11 +44,11 @@ export function AboutPage() {
   return (
     <main className="about-page">
       <header className="about-header">
-        <a className="about-back-link" href="#/">
+        <a className="about-back-link" href={getPageHref('library')}>
           <ArrowLeft aria-hidden="true" size={17} strokeWidth={1.7} />
           {t('common.backToLibrary')}
         </a>
-        <a className="about-brand" href="#/" aria-label={t('about.homeLabel')}>
+        <a className="about-brand" href={getPageHref('library')} aria-label={t('about.homeLabel')}>
           {t('common.brand')}
         </a>
       </header>
@@ -87,7 +88,7 @@ export function AboutPage() {
             <p className="about-section-kicker">{t('about.privacyKicker')}</p>
             <h2 id="privacy-title">{t('about.privacyTitle')}</h2>
             <p>{t('about.privacyBody')}</p>
-            <a className="about-privacy-link" href="#/privacy">
+            <a className="about-privacy-link" href={getPageHref('privacy')}>
               {t('about.privacyLink')}
             </a>
           </div>
@@ -121,13 +122,13 @@ export function AboutPage() {
       </div>
 
       <footer className="about-footer">
-        <a className="about-footer-brand" href="#/">
+        <a className="about-footer-brand" href={getPageHref('library')}>
           {t('common.brand')}
         </a>
         <div className="about-footer-meta">
           <span>© yuzhou</span>
           <span aria-hidden="true">·</span>
-          <a href="#/privacy">{t('common.privacy')}</a>
+          <a href={getPageHref('privacy')}>{t('common.privacy')}</a>
         </div>
         <LanguageSwitcher compact />
       </footer>

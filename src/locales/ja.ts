@@ -3,7 +3,11 @@ export const ja = {
     brand: 'Lento', brandShort: 'Lento', tagline: '本のための時間を。', slogan: '急がずに読もう。', backToLibrary: '本棚に戻る', toc: '目次', search: '検索', excerpts: '読書メモ', cancel: 'キャンセル', clear: 'クリア', close: '閉じる', delete: '削除', manage: '管理', favorite: 'お気に入り', loading: '読み込み中…', loadFailed: '読み込み失敗', refreshing: '更新', add: '追加', all: 'すべて', privacy: 'プライバシー', about: 'Lentoについて', books_other: '{{count}}冊', items_other: '{{count}}件',
   },
   language: { label: '言語', select: '表示言語を選択' },
-  app: { aboutTitle: 'Lentoについて', privacyTitle: 'プライバシーポリシー · Lento', homeTitle: 'Lento', opening: '開いています…' },
+  seo: {
+    description: "Lento は、本棚の整理、全文検索、しおり、ハイライト、メモに対応したローカル優先の EPUB リーダーです。登録は不要で、本と読書記録はこのブラウザーに保存されます。",
+    javascriptNotice: "EPUB の読み込みと読書には JavaScript が必要です。製品紹介とプライバシーポリシーはそのまま閲覧できます。",
+  },
+  app: { aboutTitle: 'Lentoについて', privacyTitle: 'プライバシーポリシー · Lento', homeTitle: "Lento — EPUB リーダー・ローカル本棚・読書ノート", opening: '開いています…' },
   library: {
     heading: 'マイ本棚', productInfo: '製品情報', searchEmptyTitle: '条件に合う本がありません', searchEmptyBody: '別のキーワードを試すか、フィルターを解除してください。', clearFilters: 'フィルターを解除', emptyTitle: '本棚はまだ空です', emptyBody: 'EPUBファイルを選択またはドロップして始めましょう。', dropTitle: 'ドロップしてEPUBを追加', dropBody: '複数の本を一度に追加できます', dismissNotice: '通知を閉じる', deleted: '『{{title}}』を削除しました。', undo: '元に戻す', updateFailed: '書籍情報を更新できませんでした。',
     toolbar: { label: '本棚を管理', search: '書名または著者で検索', sort: '並び順', filterStatus: '読書状況で絞り込む', filterTags: 'タグで絞り込む', tags: 'タグ', sortRecent: '最近読んだ順', sortAdded: '追加日順', sortProgress: '進捗順' },

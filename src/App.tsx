@@ -12,6 +12,8 @@ import { LibraryPage } from './components/library/LibraryPage'
 import { useBookImport } from './components/library/ImportBookButton'
 import type { LibraryAlertNotice } from './components/library/LibraryAlert'
 import { PrivacyPage } from './components/privacy/PrivacyPage'
+import { normalizeLegacyPublicRoute, resolveAppRoute } from './lib/app-route'
+import { updatePageMetadata } from './seo/metadata'
 import {
   deleteBook,
   getBooks,
@@ -28,26 +30,12 @@ const ReaderPage = lazy(() =>
   })),
 )
 
-type AppRoute =
-  | { page: 'library' }
-  | { page: 'about' }
-  | { page: 'privacy' }
-  | { page: 'reader'; bookId: string }
-
-function getRouteFromHash(): AppRoute {
-  if (window.location.hash === '#/about') return { page: 'about' }
-  if (window.location.hash === '#/privacy') return { page: 'privacy' }
-
-  const match = window.location.hash.match(/^#\/book\/(.+)$/)
-  return match
-    ? { page: 'reader', bookId: decodeURIComponent(match[1]) }
-    : { page: 'library' }
-}
-
 export function App() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [books, setBooks] = useState<BookRecord[]>([])
-  const [route, setRoute] = useState<AppRoute>(getRouteFromHash)
+  const [route, setRoute] = useState(() => resolveAppRoute(
+    window.location.pathname, window.location.hash, import.meta.env.BASE_URL,
+  ))
   const [isLoading, setIsLoading] = useState(true)
   const [libraryNotice, setLibraryNotice] = useState<LibraryAlertNotice>()
 
@@ -76,19 +64,23 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    const handleHashChange = () => setRoute(getRouteFromHash())
+    const handleHashChange = () => {
+      if (normalizeLegacyPublicRoute()) return
+      setRoute(resolveAppRoute(
+        window.location.pathname, window.location.hash, import.meta.env.BASE_URL,
+      ))
+    }
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
 
   useEffect(() => {
-    document.title =
-      route.page === 'about'
-        ? t('app.aboutTitle')
-        : route.page === 'privacy'
-          ? t('app.privacyTitle')
-          : t('app.homeTitle')
-  }, [route.page, t])
+    updatePageMetadata(
+      route.page === 'reader' ? 'library' : route.page,
+      t,
+      i18n.resolvedLanguage ?? 'zh-CN',
+    )
+  }, [route.page, t, i18n.resolvedLanguage])
 
   useEffect(() => {
     if (__LENTO_BUILD_TARGET__ !== 'web' || isLoading) return
@@ -143,20 +135,20 @@ export function App() {
     setBooks(await getBooks())
   }
 
-  if (isLoading) {
-    return (
-      <main className="loading-screen">
-        <span>{t('common.brand')}</span>
-      </main>
-    )
-  }
-
   if (route.page === 'about') {
     return <AboutPage />
   }
 
   if (route.page === 'privacy') {
     return <PrivacyPage />
+  }
+
+  if (isLoading) {
+    return (
+      <main className="loading-screen">
+        <span>{t('common.brand')}</span>
+      </main>
+    )
   }
 
   if (activeBookId && activeBook) {

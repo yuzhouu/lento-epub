@@ -73,6 +73,14 @@ button:focus-visible,
   letter-spacing: 0.03em;
 }
 
+.javascript-notice {
+  margin: 0;
+  padding: 16px 28px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
 .language-switcher {
   display: inline-flex;
   min-height: 40px;

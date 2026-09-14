@@ -1,3 +1,4 @@
+import { getPageHref } from '../../lib/app-route'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { LanguageSwitcher } from '../LanguageSwitcher'
@@ -11,11 +12,11 @@ export function PrivacyPage() {
   return (
     <main className="about-page privacy-page">
       <header className="about-header">
-        <a className="about-back-link" href="#/">
+        <a className="about-back-link" href={getPageHref('library')}>
           <ArrowLeft aria-hidden="true" size={17} strokeWidth={1.7} />
           {t('common.backToLibrary')}
         </a>
-        <a className="about-brand" href="#/" aria-label={t('about.homeLabel')}>
+        <a className="about-brand" href={getPageHref('library')} aria-label={t('about.homeLabel')}>
           {t('common.brand')}
         </a>
       </header>
@@ -113,13 +114,13 @@ export function PrivacyPage() {
       </div>
 
       <footer className="about-footer">
-        <a className="about-footer-brand" href="#/">
+        <a className="about-footer-brand" href={getPageHref('library')}>
           {t('common.brand')}
         </a>
         <div className="about-footer-meta">
           <span>© yuzhou</span>
           <span aria-hidden="true">·</span>
-          <a href="#/about">{t('common.about')}</a>
+          <a href={getPageHref('about')}>{t('common.about')}</a>
         </div>
         <LanguageSwitcher compact />
       </footer>

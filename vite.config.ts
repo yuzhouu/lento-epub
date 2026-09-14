@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { DEFAULT_SITE_URL, normalizeSiteUrl } from './src/seo/metadata.ts'
 
 type BuildTarget = 'web' | 'extension'
 
@@ -70,98 +70,6 @@ function targetStaticAssetsPlugin(target: BuildTarget): Plugin {
   }
 }
 
-function withBase(base: string, fileName: string): string {
-  return `${base}${fileName.replace(/^\//, '')}`
-}
-
-function webServiceWorkerPlugin(base: string): Plugin {
-  return {
-    name: 'lento-web-service-worker',
-    apply: 'build',
-    generateBundle(_options, bundle) {
-      const cacheHash = createHash('sha256')
-      const precacheUrls = new Set<string>([
-        base,
-        withBase(base, 'index.html'),
-      ])
-
-      for (const [fileName, output] of Object.entries(bundle)) {
-        if (fileName.endsWith('.map')) continue
-        precacheUrls.add(withBase(base, fileName))
-        cacheHash.update(fileName)
-        cacheHash.update(
-          output.type === 'chunk'
-            ? output.code
-            : typeof output.source === 'string'
-              ? output.source
-              : output.source,
-        )
-      }
-
-      const cacheVersion = cacheHash.digest('hex').slice(0, 12)
-      const appShellUrl = withBase(base, 'index.html')
-      const serviceWorkerSource = `const CACHE_NAME = 'lento-app-${cacheVersion}'
-const APP_SHELL_URL = ${JSON.stringify(appShellUrl)}
-const PRECACHE_URLS = ${JSON.stringify([...precacheUrls].sort(), null, 2)}
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting()),
-  )
-})
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((cacheNames) =>
-        Promise.all(
-          cacheNames
-            .filter((cacheName) =>
-              cacheName.startsWith('lento-app-') && cacheName !== CACHE_NAME,
-            )
-            .map((cacheName) => caches.delete(cacheName)),
-        ),
-      )
-      .then(() => self.clients.claim()),
-  )
-})
-
-self.addEventListener('fetch', (event) => {
-  const request = event.request
-  if (request.method !== 'GET') return
-
-  const requestUrl = new URL(request.url)
-  if (requestUrl.origin !== self.location.origin) return
-
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).catch(() => caches.match(APP_SHELL_URL)),
-    )
-    return
-  }
-
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse
-      return fetch(request)
-    }),
-  )
-})
-`
-
-      this.emitFile({
-        type: 'asset',
-        fileName: 'service-worker.js',
-        source: serviceWorkerSource,
-      })
-    },
-  }
-}
-
 export default defineConfig(({ mode }) => {
   const target = getBuildTarget(mode)
   const base = target === 'web' ? getWebBasePath() : '/'
@@ -171,14 +79,13 @@ export default defineConfig(({ mode }) => {
     targetStaticAssetsPlugin(target),
   ]
 
-  if (target === 'web') plugins.push(webServiceWorkerPlugin(base))
-
   return {
     base,
     publicDir: false,
     plugins,
     define: {
       __LENTO_BUILD_TARGET__: JSON.stringify(target),
+      __LENTO_SITE_URL__: JSON.stringify(normalizeSiteUrl(process.env.LENTO_SITE_URL || DEFAULT_SITE_URL)),
     },
     build: {
       outDir: `dist/${target}`,

@@ -1,3 +1,4 @@
+import { getPageHref } from '../../lib/app-route'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -224,6 +225,9 @@ export function LibraryPage({
               <div className="empty-library">
                 <h3>{t('library.emptyTitle')}</h3>
                 <p>{t('library.emptyBody')}</p>
+                {__LENTO_BUILD_TARGET__ === 'web' ? (
+                  <p className="library-product-description">{t('seo.description')}</p>
+                ) : null}
                 <ImportBookButton
                   isImporting={isImporting}
                   onFilesSelected={(files) => void onImportFiles(files)}
@@ -245,11 +249,11 @@ export function LibraryPage({
             <span className="library-footer-separator" aria-hidden="true">
               ·
             </span>
-            <a href="#/about">{t('common.about')}</a>
+            <a href={getPageHref('about')}>{t('common.about')}</a>
             <span className="library-footer-separator" aria-hidden="true">
               ·
             </span>
-            <a href="#/privacy">{t('common.privacy')}</a>
+            <a href={getPageHref('privacy')}>{t('common.privacy')}</a>
           </nav>
           <LanguageSwitcher compact />
         </div>

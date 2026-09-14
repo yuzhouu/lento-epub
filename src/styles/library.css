@@ -1303,6 +1303,15 @@
   min-height: 54px;
 }
 
+.library-page.is-empty .empty-library .library-product-description {
+  max-width: 34em;
+  margin-top: -16px;
+  margin-bottom: 24px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
 .empty-library-filtered {
   min-height: 320px;
 }

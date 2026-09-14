@@ -5,7 +5,11 @@ export const en = {
     books_one: '{{count}} book', books_other: '{{count}} books', items_one: '{{count}} item', items_other: '{{count}} items',
   },
   language: { label: 'Language', select: 'Select interface language' },
-  app: { aboutTitle: 'About · Lento', privacyTitle: 'Privacy Policy · Lento', homeTitle: 'Lento', opening: 'Opening…' },
+  seo: {
+    description: "Lento is a local-first EPUB reader with library organization, full-text search, bookmarks, highlights, and notes. No account needed; books and reading records stay in this browser.",
+    javascriptNotice: "Enable JavaScript to import and read EPUB books. Product information and the privacy policy are still available.",
+  },
+  app: { aboutTitle: 'About · Lento', privacyTitle: 'Privacy Policy · Lento', homeTitle: "Lento — Online EPUB Reader, Local Library & Reading Notes", opening: 'Opening…' },
   library: {
     heading: 'My library', productInfo: 'Product information', searchEmptyTitle: 'No matching books', searchEmptyBody: 'Try another keyword or clear the current filters.', clearFilters: 'Clear filters', emptyTitle: 'Your library is empty', emptyBody: 'Choose or drop EPUB files to begin.', dropTitle: 'Drop to add EPUB files', dropBody: 'You can add several books at once', dismissNotice: 'Dismiss notification', deleted: 'Deleted “{{title}}”.', undo: 'Undo', updateFailed: 'Could not update the book.',
     toolbar: { label: 'Manage library', search: 'Search by title or author', sort: 'Sort', filterStatus: 'Filter by reading status', filterTags: 'Filter by tag', tags: 'Tags', sortRecent: 'Recently read', sortAdded: 'Date added', sortProgress: 'Reading progress' },

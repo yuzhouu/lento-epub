@@ -28,10 +28,14 @@ export const zhCN = {
     label: '语言',
     select: '选择界面语言',
   },
+  seo: {
+    description: "卷舍是一个本地优先的在线 EPUB 阅读器，支持书库整理、全文搜索、书签、划线和批注。无需注册，书籍与阅读记录保存在当前浏览器。",
+    javascriptNotice: "阅读和导入 EPUB 需要启用 JavaScript。产品介绍和隐私政策仍可直接浏览。",
+  },
   app: {
     aboutTitle: '关于 · 卷舍 Lento',
     privacyTitle: '隐私政策 · 卷舍 Lento',
-    homeTitle: '卷舍 · Lento',
+    homeTitle: "卷舍 · Lento — 在线 EPUB 阅读器，本地书库与阅读笔记",
     opening: '正在翻开…',
   },
   library: {
