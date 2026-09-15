@@ -55,6 +55,8 @@ EPUB 文件、阅读位置、进度、书签、划线、批注与偏好都留在
 
 `npm run build:web` 会在 `dist/web` 生成首页、`about/` 和 `privacy/` 的完整 HTML，以及网站地图、抓取配置和离线缓存。阅读器仍使用本地书库和书籍地址；书籍、阅读记录不会进入网站地图。
 
+页面正文通过 React 的 `prerenderToNodeStream()` 生成，浏览器使用 `hydrateRoot()` 复用已有 DOM。构建和首次渲染共用同一个 `App`、中文和页面路由，水合后再恢复语言偏好、读取本地书库并处理书籍地址。开发模式与 Chrome 扩展没有预渲染 HTML，继续使用 `createRoot()`。
+
 GitHub Pages 工作流自动传入 `LENTO_BASE_PATH` 和 `LENTO_SITE_URL`。部署到其他域名时，将 `LENTO_SITE_URL` 设为网站完整 HTTPS 地址（包含部署子路径），并设置对应的 `LENTO_BASE_PATH`。构建会校验正文、规范网址、静态资源和网站地图，阻止本机地址或错误链接进入产物。
 
 当前网站地图地址为 `https://yuzhouu.github.io/lento-epub/sitemap.xml`。子目录内的 `robots.txt` 不控制整个域名；域名根站的 `robots.txt` 需要列出这份网站地图。发布后，在 Google Search Console、Bing Webmaster Tools 等站长平台验证网站所有权，提交网站地图，并通过 URL 检查确认实际收录状态。

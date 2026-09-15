@@ -6,6 +6,7 @@ import { ja } from './locales/ja'
 import { ru } from './locales/ru'
 import { fr } from './locales/fr'
 import { es } from './locales/es'
+import { getPrerenderedPage, PRERENDER_LANGUAGE } from './seo/hydration'
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'zh-CN', label: '中文' },
@@ -39,7 +40,7 @@ function normalizeLanguage(language: string | null | undefined): AppLanguage | u
   return supportedLanguageCodes.has(baseLanguage) ? baseLanguage : undefined
 }
 
-function getInitialLanguage(): AppLanguage {
+function getPreferredLanguage(): AppLanguage {
   try {
     const storedLanguage = normalizeLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY))
     if (storedLanguage) return storedLanguage
@@ -54,6 +55,23 @@ function getInitialLanguage(): AppLanguage {
     }
   }
   return 'zh-CN'
+}
+
+function getInitialLanguage(): AppLanguage {
+  if (
+    typeof document !== 'undefined' &&
+    getPrerenderedPage(document.getElementById('root'))
+  ) {
+    return PRERENDER_LANGUAGE
+  }
+  return getPreferredLanguage()
+}
+
+export async function restorePreferredLanguage(): Promise<void> {
+  const preferredLanguage = getPreferredLanguage()
+  if (preferredLanguage !== getCurrentLanguage()) {
+    await i18n.changeLanguage(preferredLanguage)
+  }
 }
 
 function synchronizeDocumentLanguage(language: string) {

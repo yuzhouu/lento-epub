@@ -9,6 +9,12 @@ export async function checkSeo(directory, base, siteUrl) {
     const html = await readFile(join(directory, route, 'index.html'), 'utf8')
     const head = html.match(/<head>([\s\S]*?)<\/head>/)?.[1] ?? ''
     const body = html.match(/<main[\s\S]*?<\/main>/)?.[0] ?? ''
+    const page = route ? route.slice(0, -1) : 'library'
+    assert.ok(html.includes(`data-prerendered-page="${page}"`), `${route} is missing its hydration route`)
+    if (page === 'library') {
+      assert.ok(body.includes('aria-busy="true"'), 'The initial library must wait for local books')
+      assert.ok(!body.includes('这里还没有书'), 'The initial HTML must not claim that the local library is empty')
+    }
     assert.ok(body.replace(/<[^>]*>/g, '').length > 150, `${route} has no readable static body`)
     assert.ok(body.includes('EPUB'), `${route} omits the product description`)
     assert.equal((head.match(/<title>/g) ?? []).length, 1)

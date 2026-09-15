@@ -1,39 +1,29 @@
+import { text } from 'node:stream/consumers'
+import { StrictMode } from 'react'
+import { prerenderToNodeStream } from 'react-dom/static'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { AboutPage } from '../components/about/AboutPage'
-import { PrivacyPage } from '../components/privacy/PrivacyPage'
-import { LibraryPage } from '../components/library/LibraryPage'
+import { App } from '../App'
 import i18n from '../i18n'
 import type { PublicPage } from '../lib/app-route'
 import { getPageMetadata, getStructuredData } from './metadata'
-
-const ignore = () => undefined
-const ignoreAsync = async () => undefined
+import { PRERENDER_LANGUAGE } from './hydration'
 
 export async function renderPublicPages() {
-  await i18n.changeLanguage('zh-CN')
-  const t = i18n.getFixedT('zh-CN')
+  await i18n.changeLanguage(PRERENDER_LANGUAGE)
+  const t = i18n.getFixedT(PRERENDER_LANGUAGE)
   const pages: PublicPage[] = ['library', 'about', 'privacy']
-  return pages.map((page) => {
-    const content = page === 'about' ? <AboutPage /> : page === 'privacy' ? <PrivacyPage /> : (
-      <LibraryPage
-        books={[]}
-        libraryNotice={undefined}
-        isImporting={false}
-        onImportFiles={ignoreAsync}
-        onLibraryNoticeChange={ignore}
-        onRestored={ignore}
-        onDelete={ignoreAsync}
-        onUndoDelete={ignoreAsync}
-        onUpdateBook={ignoreAsync}
-        onOpen={ignore}
-      />
+  return Promise.all(pages.map(async (page) => {
+    const { prelude } = await prerenderToNodeStream(
+      <StrictMode><App initialRoute={{ page }} /></StrictMode>,
     )
     const metadata = getPageMetadata(page, t, __LENTO_SITE_URL__)
-    const structuredData = getStructuredData(page, metadata, __LENTO_SITE_URL__, 'zh-CN')
+    const structuredData = getStructuredData(page, metadata, __LENTO_SITE_URL__, PRERENDER_LANGUAGE)
     return {
+      page,
       fileName: page === 'library' ? 'index.html' : `${page}/index.html`,
       url: metadata.url,
-      body: renderToStaticMarkup(content),
+      body: await text(prelude),
+      // Metadata and the no-JavaScript notice live outside the hydrated root.
       head: renderToStaticMarkup(<>
         <title>{metadata.title}</title>
         <meta name="description" content={metadata.description} />
@@ -59,5 +49,5 @@ export async function renderPublicPages() {
       </>),
       notice: renderToStaticMarkup(<noscript><p className="javascript-notice">{t('seo.javascriptNotice')}</p></noscript>),
     }
-  })
+  }))
 }

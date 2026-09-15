@@ -36,7 +36,7 @@ try {
   for (const page of pages) {
     const html = shell
       .replace(/<title>[\s\S]*?<\/title>/, page.head)
-      .replace('<div id="root"></div>', `<div id="root">${page.body}</div>${page.notice}`)
+      .replace('<div id="root"></div>', `<div id="root" data-prerendered-page="${page.page}">${page.body}</div>${page.notice}`)
     const path = join(output, page.fileName)
     await mkdir(dirname(path), { recursive: true })
     await writeFile(path, html)

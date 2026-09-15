@@ -35,6 +35,7 @@ import { LanguageSwitcher } from '../LanguageSwitcher'
 
 interface LibraryPageProps {
   books: BookRecord[]
+  isLoading: boolean
   libraryNotice: LibraryAlertNotice | undefined
   isImporting: boolean
   onImportFiles: (files: File[]) => Promise<void>
@@ -48,6 +49,7 @@ interface LibraryPageProps {
 
 export function LibraryPage({
   books,
+  isLoading,
   libraryNotice,
   isImporting,
   onImportFiles,
@@ -60,7 +62,9 @@ export function LibraryPage({
 }: LibraryPageProps) {
   const { t } = useTranslation()
   const [managedBookId, setManagedBookId] = useState<string>()
-  const drop = useEpubDrop(onImportFiles)
+  const drop = useEpubDrop(async (files) => {
+    if (!isLoading) await onImportFiles(files)
+  })
   const query = useLibraryQuery(books)
   const storageInfo = useLibraryStorage(books)
   const deletion = useDeleteUndo({
@@ -98,6 +102,7 @@ export function LibraryPage({
 
   return (
     <main
+      aria-busy={isLoading}
       className={`library-page${books.length ? '' : ' is-empty'}${
         drop.isDraggingFiles ? ' is-dragging' : ''
       }`}
@@ -112,7 +117,7 @@ export function LibraryPage({
             <span>{t('common.slogan')}</span>
           </div>
         </div>
-        <div className="library-actions">
+        <div className="library-actions" inert={isLoading}>
           <InstallAppButton />
           <LibraryBackupActions
             hasBooks={books.length > 0}
@@ -215,7 +220,7 @@ export function LibraryPage({
             <div className="library-empty-copy">
               <div className="library-empty-heading">
                 <h2 id="library-title">{t('library.heading')}</h2>
-                <span>{t('common.books', { count: 0 })}</span>
+                <span>{isLoading ? t('common.loading') : t('common.books', { count: 0 })}</span>
               </div>
 
               <span className="library-empty-accent" aria-hidden="true" />
@@ -223,15 +228,17 @@ export function LibraryPage({
               <LibraryStorageWarning storageInfo={storageInfo} />
 
               <div className="empty-library">
-                <h3>{t('library.emptyTitle')}</h3>
+                <h3>{t(isLoading ? 'common.tagline' : 'library.emptyTitle')}</h3>
                 <p>{t('library.emptyBody')}</p>
                 {__LENTO_BUILD_TARGET__ === 'web' ? (
                   <p className="library-product-description">{t('seo.description')}</p>
                 ) : null}
-                <ImportBookButton
-                  isImporting={isImporting}
-                  onFilesSelected={(files) => void onImportFiles(files)}
-                />
+                <div inert={isLoading}>
+                  <ImportBookButton
+                    isImporting={isImporting}
+                    onFilesSelected={(files) => void onImportFiles(files)}
+                  />
+                </div>
               </div>
             </div>
 

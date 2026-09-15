@@ -12,7 +12,8 @@ import { LibraryPage } from './components/library/LibraryPage'
 import { useBookImport } from './components/library/ImportBookButton'
 import type { LibraryAlertNotice } from './components/library/LibraryAlert'
 import { PrivacyPage } from './components/privacy/PrivacyPage'
-import { normalizeLegacyPublicRoute, resolveAppRoute } from './lib/app-route'
+import { normalizeLegacyPublicRoute, resolveAppRoute, type AppRoute } from './lib/app-route'
+import { restorePreferredLanguage } from './i18n'
 import { updatePageMetadata } from './seo/metadata'
 import {
   deleteBook,
@@ -30,12 +31,10 @@ const ReaderPage = lazy(() =>
   })),
 )
 
-export function App() {
+export function App({ initialRoute }: { initialRoute: AppRoute }) {
   const { t, i18n } = useTranslation()
   const [books, setBooks] = useState<BookRecord[]>([])
-  const [route, setRoute] = useState(() => resolveAppRoute(
-    window.location.pathname, window.location.hash, import.meta.env.BASE_URL,
-  ))
+  const [route, setRoute] = useState(initialRoute)
   const [isLoading, setIsLoading] = useState(true)
   const [libraryNotice, setLibraryNotice] = useState<LibraryAlertNotice>()
 
@@ -58,6 +57,7 @@ export function App() {
   )
 
   useEffect(() => {
+    void restorePreferredLanguage()
     void getBooks()
       .then(setBooks)
       .finally(() => setIsLoading(false))
@@ -70,6 +70,7 @@ export function App() {
         window.location.pathname, window.location.hash, import.meta.env.BASE_URL,
       ))
     }
+    handleHashChange()
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
@@ -143,7 +144,7 @@ export function App() {
     return <PrivacyPage />
   }
 
-  if (isLoading) {
+  if (isLoading && route.page === 'reader') {
     return (
       <main className="loading-screen">
         <span>{t('common.brand')}</span>
@@ -172,6 +173,7 @@ export function App() {
   return (
     <LibraryPage
       books={books}
+      isLoading={isLoading}
       libraryNotice={libraryNotice}
       isImporting={importer.isImporting}
       onImportFiles={importer.importFiles}
